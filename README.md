@@ -1,21 +1,73 @@
-# Routes
+# Fitboard - Job Matching Platform
 
-TanStack Start uses **file-based routing**. Every `.tsx` file in this directory
-defines a route. Do **not** create `src/pages/`, `src/routes/_app/index.tsx`, or
-`app/layout.tsx` — those are Next.js / Remix conventions. The only root layout
-is `src/routes/__root.tsx`.
+A modern job matching platform that uses skill-vector algorithms to match candidates with jobs based on weighted cosine similarity. Built with TanStack Start, React, and Tailwind CSS.
 
-## Conventions
+## Features
+
+- **Resume Parsing**: PDF/DOCX → structured JSON via LLM extraction
+- **Skill-Vector Scoring**: Weighted cosine similarity for objective candidate-job matching
+- **Kanban Pipeline**: Track applications from Applied → Offered
+- **Interview Scheduling**: Calendar sync and email notifications
+- **Real-time Matching**: Instant fit scores for every application
+
+## Tech Stack
+
+- **Framework**: TanStack Start (React SSR)
+- **Styling**: Tailwind CSS with custom design system
+- **UI Components**: Radix UI primitives
+- **State Management**: TanStack Query
+- **Routing**: TanStack Router (file-based)
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm or bun
+
+### Installation
+
+```bash
+npm install
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:8080` to see the application.
+
+### Build
+
+```bash
+npm run build
+```
+
+## Project Structure
+
+```
+src/
+├── components/ui/    # Reusable UI components
+├── routes/          # File-based routing
+│   ├── __root.tsx   # Root layout
+│   └── index.tsx     # Home page
+├── styles.css       # Global styles and design system
+├── router.tsx       # Router configuration
+└── server.ts        # SSR entry point
+```
+
+## Routing
+
+This project uses TanStack Start's file-based routing:
 
 | File | URL |
 | --- | --- |
 | `index.tsx` | `/` |
 | `about.tsx` | `/about` |
-| `users/index.tsx` | `/users` |
-| `users/$id.tsx` | `/users/:id` (dynamic — bare `$`, no curly braces) |
-| `posts/{-$category}.tsx` | `/posts/:category?` (optional segment) |
-| `files/$.tsx` | `/files/*` (splat — read via `_splat` param, never `*`) |
-| `_layout.tsx` | layout route (renders children via `<Outlet />`) |
-| `__root.tsx` | app shell — wraps every page; preserve `<Outlet />` |
+| `users/$id.tsx` | `/users/:id` (dynamic) |
 
-`routeTree.gen.ts` is auto-generated. Don't edit it by hand.
+## License
+
+MIT
