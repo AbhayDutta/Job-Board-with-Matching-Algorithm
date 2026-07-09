@@ -44,6 +44,6 @@ The planned production stack — detailed in the project synopsis — is:
 
 <div align="center">
 
-*Week 1 of 4 — UI complete. Backend begins Week 2.*
+
 
 </div>
