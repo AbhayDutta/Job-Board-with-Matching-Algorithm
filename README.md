@@ -1,73 +1,71 @@
-# Fitboard - Job Matching Platform
+# Fitboard — Job Board with Matching Algorithm
 
-A modern job matching platform that uses skill-vector algorithms to match candidates with jobs based on weighted cosine similarity. Built with TanStack Start, React, and Tailwind CSS.
+Fitboard turns resumes into structured skill vectors and scores every
+candidate–job pairing with weighted cosine similarity — so recruiters stop
+guessing and candidates stop applying blind.
 
-## Features
+## 🖼️ Preview
 
-- **Resume Parsing**: PDF/DOCX → structured JSON via LLM extraction
-- **Skill-Vector Scoring**: Weighted cosine similarity for objective candidate-job matching
-- **Kanban Pipeline**: Track applications from Applied → Offered
-- **Interview Scheduling**: Calendar sync and email notifications
-- **Real-time Matching**: Instant fit scores for every application
+![Fitboard homepage](./homepage.png)
 
-## Tech Stack
+## ✨ What it does
 
-- **Framework**: TanStack Start (React SSR)
-- **Styling**: Tailwind CSS with custom design system
-- **UI Components**: Radix UI primitives
-- **State Management**: TanStack Query
-- **Routing**: TanStack Router (file-based)
+- **Resume parsing** — Drop a PDF or DOCX; an LLM extracts skills, experience,
+  and education into validated, structured JSON.
+- **Skill-vector matching** — Both job requirements and candidate profiles
+  become weighted skill vectors (must-haves outweigh nice-to-haves). Cosine
+  similarity produces a transparent, explainable percentage fit score —
+  no black box.
+- **Application pipeline** — A Kanban-style board (Applied → Reviewed →
+  Interviewed → Offered) with calendar-synced interview scheduling and
+  automated email notifications.
+- **For candidates** — See a fit score before applying, get a personalised
+  job feed based on your extracted skill vector, and track every application
+  in one place.
+- **For employers** — Post structured job requirements (must-have vs
+  nice-to-have skills) and receive pre-ranked applicants instead of an
+  unsorted queue.
 
-## Getting Started
+## 🧠 The algorithm, in short
 
-### Prerequisites
+1. **Upload** — PDF/DOCX text is extracted (pdf-parse / mammoth), no manual
+   form-filling.
+2. **Parse** — An LLM extracts skills, experience, and education into
+   validated JSON.
+3. **Vectorize** — Job requirements and candidate profiles become weighted
+   skill vectors.
+4. **Rank** — Cosine similarity produces a % fit score; applicants are
+   sorted, candidates get personalised recommendations.
 
-- Node.js 18+
-- npm or bun
+## 🛠️ Tech Stack
 
-### Installation
+> **Note:** This repository is a **UI/design prototype**, scaffolded with
+> Lovable for rapid iteration on the Week 1 design deliverable. It currently
+> runs on TanStack Start + Vite + shadcn/ui (Radix primitives). The planned
+> production stack — documented in the full project synopsis — is
+> **Next.js, TypeScript, Prisma, and Neon (serverless Postgres)**, which the
+> UI will be migrated into for backend integration in subsequent weeks.
 
-```bash
-npm install
-```
+**Current prototype:**
+- TanStack Start (React SSR) + TanStack Router
+- Vite
+- Tailwind CSS
+- shadcn/ui (Radix UI primitives)
+- Bun
 
-### Development
+**Planned production stack:**
+- Next.js (TypeScript)
+- Prisma ORM + Neon (serverless PostgreSQL)
+- NextAuth.js (role-based auth: candidate vs employer)
+- Gemini API (LLM-based resume parsing)
+- Razorpay (payments, test mode)
+- Vercel (deployment)
 
-```bash
-npm run dev
-```
+## 📌 Status
 
-Visit `http://localhost:8080` to see the application.
+**Week 1 of 4** — UI design and implementation complete. Backend (auth,
+database, matching engine, resume parsing) begins Week 2.
 
-### Build
+## 📄 License
 
-```bash
-npm run build
-```
-
-## Project Structure
-
-```
-src/
-├── components/ui/    # Reusable UI components
-├── routes/          # File-based routing
-│   ├── __root.tsx   # Root layout
-│   └── index.tsx     # Home page
-├── styles.css       # Global styles and design system
-├── router.tsx       # Router configuration
-└── server.ts        # SSR entry point
-```
-
-## Routing
-
-This project uses TanStack Start's file-based routing:
-
-| File | URL |
-| --- | --- |
-| `index.tsx` | `/` |
-| `about.tsx` | `/about` |
-| `users/$id.tsx` | `/users/:id` (dynamic) |
-
-## License
-
-MIT
+Academic project — for evaluation purposes.
