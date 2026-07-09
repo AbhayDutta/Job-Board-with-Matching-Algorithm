@@ -1,71 +1,49 @@
-# Fitboard — Job Board with Matching Algorithm
+<div align="center">
 
-Fitboard turns resumes into structured skill vectors and scores every
-candidate–job pairing with weighted cosine similarity — so recruiters stop
-guessing and candidates stop applying blind.
+# Fitboard
 
-## 🖼️ Preview
+**Job matching that actually fits.**
+
+Resumes become structured skill vectors. Every match is scored with weighted cosine similarity — not keywords.
 
 ![Fitboard homepage](./homepage.png)
 
-## ✨ What it does
+</div>
 
-- **Resume parsing** — Drop a PDF or DOCX; an LLM extracts skills, experience,
-  and education into validated, structured JSON.
-- **Skill-vector matching** — Both job requirements and candidate profiles
-  become weighted skill vectors (must-haves outweigh nice-to-haves). Cosine
-  similarity produces a transparent, explainable percentage fit score —
-  no black box.
-- **Application pipeline** — A Kanban-style board (Applied → Reviewed →
-  Interviewed → Offered) with calendar-synced interview scheduling and
-  automated email notifications.
-- **For candidates** — See a fit score before applying, get a personalised
-  job feed based on your extracted skill vector, and track every application
-  in one place.
-- **For employers** — Post structured job requirements (must-have vs
-  nice-to-have skills) and receive pre-ranked applicants instead of an
-  unsorted queue.
+<br>
 
-## 🧠 The algorithm, in short
+## How it works
 
-1. **Upload** — PDF/DOCX text is extracted (pdf-parse / mammoth), no manual
-   form-filling.
-2. **Parse** — An LLM extracts skills, experience, and education into
-   validated JSON.
-3. **Vectorize** — Job requirements and candidate profiles become weighted
-   skill vectors.
-4. **Rank** — Cosine similarity produces a % fit score; applicants are
-   sorted, candidates get personalised recommendations.
+```
+Upload  →  Parse  →  Vectorize  →  Rank
+ PDF/DOCX   LLM extraction   Weighted skill vectors   Cosine similarity → % fit
+```
 
-## 🛠️ Tech Stack
+No black boxes — every score breaks down into which skills matched, and how much each was weighted.
 
-> **Note:** This repository is a **UI/design prototype**, scaffolded with
-> Lovable for rapid iteration on the Week 1 design deliverable. It currently
-> runs on TanStack Start + Vite + shadcn/ui (Radix primitives). The planned
-> production stack — documented in the full project synopsis — is
-> **Next.js, TypeScript, Prisma, and Neon (serverless Postgres)**, which the
-> UI will be migrated into for backend integration in subsequent weeks.
+<br>
 
-**Current prototype:**
-- TanStack Start (React SSR) + TanStack Router
-- Vite
-- Tailwind CSS
-- shadcn/ui (Radix UI primitives)
-- Bun
+## Highlights
 
-**Planned production stack:**
-- Next.js (TypeScript)
-- Prisma ORM + Neon (serverless PostgreSQL)
-- NextAuth.js (role-based auth: candidate vs employer)
-- Gemini API (LLM-based resume parsing)
-- Razorpay (payments, test mode)
-- Vercel (deployment)
+- **Fit scores, not filters** — candidates see a % match before applying
+- **Structured parsing** — resumes → validated JSON via LLM extraction
+- **Kanban pipeline** — Applied → Reviewed → Interviewed → Offered
+- **Calendar-synced scheduling** + automated email notifications
 
-## 📌 Status
+<br>
 
-**Week 1 of 4** — UI design and implementation complete. Backend (auth,
-database, matching engine, resume parsing) begins Week 2.
+## Stack
 
-## 📄 License
+This repo is a **UI prototype** (TanStack Start · Vite · shadcn/ui), built for rapid design iteration.
 
-Academic project — for evaluation purposes.
+The planned production stack — detailed in the project synopsis — is:
+
+`Next.js` · `TypeScript` · `Prisma` · `Neon` · `NextAuth.js` · `Gemini API` · `Razorpay`
+
+<br>
+
+<div align="center">
+
+*Week 1 of 4 — UI complete. Backend begins Week 2.*
+
+</div>
