@@ -1,6 +1,10 @@
-                                                                               # Fitboard
+<div align="center">
+
+# Fitboard
 
 **Job matching that *actually* fits.**
+
+</div>
 
 A modern job board that replaces keyword search with weighted cosine-similarity matching. Resumes are parsed into structured skill vectors and scored against every job listing — so recruiters get ranked shortlists and candidates stop shouting into keyword voids.
 
