@@ -1,49 +1,18 @@
-name: Deploy to GitHub Pages
+# This workflow is DISABLED.
+# The app is a Next.js + Prisma app and cannot be deployed to GitHub Pages.
+# Deployment is handled via Vercel.
+#
+# To re-enable, uncomment the trigger below and update the build steps.
+
+name: Deploy (Disabled)
 
 on:
-  push:
-    branches: [master]
+  # Disabled — push to Vercel instead
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  placeholder:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build static Pages site
-        run: npm run build:pages
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Notice
+        run: echo "Deployment is handled by Vercel. This workflow is disabled."
