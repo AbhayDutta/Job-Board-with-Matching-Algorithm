@@ -15,11 +15,11 @@ A modern job board that replaces keyword search with weighted cosine-similarity 
 ## How it works
 
 ```
-Resume PDF  →  LLM extraction  →  Skill vector  →  Cosine similarity score  →  Ranked shortlist
+Resume PDF  →  Text Parsing  →  Skill Vector  →  Cosine Similarity Score  →  Ranked Shortlist
 ```
 
-1. **Upload** — Candidate drops a PDF/DOCX resume
-2. **Structure** — LLM extracts skills, experience, and history into clean JSON
+1. **Upload** — Candidate submits a PDF or DOCX resume
+2. **Parse** — The resume is read and skills, experience, and history are extracted into structured JSON
 3. **Vectorize** — Skills are mapped into a weighted dimensional vector
 4. **Match** — Every candidate–job pair is scored with `v_c · v_j / ‖v_c‖‖v_j‖`
 
@@ -32,7 +32,7 @@ Resume PDF  →  LLM extraction  →  Skill vector  →  Cosine similarity score
 | Framework | Next.js 16 (App Router) |
 | Database | PostgreSQL + Prisma ORM |
 | Auth | NextAuth.js |
-| AI | Google Gemini (resume parsing) |
+| Parsing | Custom resume parser (pdf-parse, mammoth) |
 | Styling | Tailwind CSS v4 |
 | Animations | Framer Motion |
 
@@ -64,14 +64,14 @@ Open [http://localhost:3000](http://localhost:3000)
 DATABASE_URL=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=
-GEMINI_API_KEY=
+GOOGLE_API_KEY=
 ```
 
 ---
 
 ## Features
 
-- **Resume parsing** — PDF/DOCX → structured JSON via LLM
+- **Resume parsing** — PDF/DOCX → structured skill data extracted via text analysis
 - **Skill-vector scoring** — Weighted cosine similarity, explainable and tunable
 - **Kanban pipeline** — Applied → Reviewed → Interviewed → Offered
 - **Two-sided platform** — Separate dashboards for candidates and employers
