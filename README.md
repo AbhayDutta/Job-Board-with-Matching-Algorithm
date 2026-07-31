@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Fitboard
 
-## Getting Started
+**Job matching that *actually* fits.**
 
-First, run the development server:
+A modern job board that replaces keyword search with weighted cosine-similarity matching. Resumes are parsed into structured skill vectors and scored against every job listing — so recruiters get ranked shortlists and candidates stop shouting into keyword voids.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+![Fitboard homescreen](./public/homescreen.png)
+
+---
+
+## How it works
+
+```
+Resume PDF  →  LLM extraction  →  Skill vector  →  Cosine similarity score  →  Ranked shortlist
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. **Upload** — Candidate drops a PDF/DOCX resume
+2. **Structure** — LLM extracts skills, experience, and history into clean JSON
+3. **Vectorize** — Skills are mapped into a weighted dimensional vector
+4. **Match** — Every candidate–job pair is scored with `v_c · v_j / ‖v_c‖‖v_j‖`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Stack
 
-## Learn More
+| Layer | Tech |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Database | PostgreSQL + Prisma ORM |
+| Auth | NextAuth.js |
+| AI | Google Gemini (resume parsing) |
+| Styling | Tailwind CSS v4 |
+| Animations | Framer Motion |
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Getting started
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# Install dependencies
+npm install
 
-## Deploy on Vercel
+# Set up environment variables
+cp .env.example .env.local
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Run database migrations
+npx prisma migrate dev
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Start the dev server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+---
+
+## Environment variables
+
+```env
+DATABASE_URL=
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=
+GEMINI_API_KEY=
+```
+
+---
+
+## Features
+
+- **Resume parsing** — PDF/DOCX → structured JSON via LLM
+- **Skill-vector scoring** — Weighted cosine similarity, explainable and tunable
+- **Kanban pipeline** — Applied → Reviewed → Interviewed → Offered
+- **Two-sided platform** — Separate dashboards for candidates and employers
+- **Match score breakdown** — Per-skill weights visible on every application
+
+---
+
+Built by [Abhay Dutta](https://github.com/AbhayDutta)
