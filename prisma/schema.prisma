@@ -1,0 +1,90 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  CANDIDATE
+  EMPLOYER
+}
+
+enum ApplicationStatus {
+  APPLIED
+  REVIEWED
+  INTERVIEWED
+  OFFERED
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  password         String // Hashed password
+  role             UserRole          @default(CANDIDATE)
+  name             String?
+  avatarUrl        String?           // Hashed profile image base64 or URL
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  candidateProfile CandidateProfile?
+  jobsPosted       Job[]             @relation("EmployerJobs")
+  applications     Application[]
+  bookmarks        Bookmark[]
+}
+
+model CandidateProfile {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  skills     Json // e.g. ["TypeScript", "React"]
+  experience Json // Structured experience data (e.g. array of jobs)
+  education  Json? // Parsed education details
+  resumeUrl  String? // Local path or filename of uploaded resume
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Job {
+  id               String        @id @default(uuid())
+  title            String
+  description      String
+  company          String
+  location         String
+  salary           String // e.g. "₹1,999/mo" or range
+  skillsRequired   Json // e.g. ["TypeScript", "PostgreSQL"] (weighted must-haves)
+  skillsNiceToHave Json // e.g. ["Next.js", "LLM APIs"] (nice-to-haves)
+  employerId       String
+  employer         User          @relation("EmployerJobs", fields: [employerId], references: [id], onDelete: Cascade)
+  applications     Application[]
+  bookmarks        Bookmark[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model Application {
+  id          String            @id @default(uuid())
+  jobId       String
+  job         Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateId String
+  candidate   User              @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  status      ApplicationStatus @default(APPLIED)
+  matchScore  Float? // Left nullable for future matching algorithm
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([jobId, candidateId]) // Prevent duplicate applications
+}
+
+model Bookmark {
+  id          String   @id @default(uuid())
+  candidateId String
+  candidate   User     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([jobId, candidateId])
+}

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-19T20:10:00Z",
+  "title": "Design System: Fitboard",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Inkwell Black", "canonical": "oklch(0.18 0.02 250)", "tonalRamp": ["oklch(0.15 0.02 250)", "oklch(0.20 0.02 250)", "oklch(0.35 0.02 250)", "oklch(0.50 0.02 250)", "oklch(0.65 0.02 250)", "oklch(0.80 0.02 250)", "oklch(0.90 0.02 250)", "oklch(0.95 0.02 250)"] },
+      "neutral-bg": { "role": "neutral", "displayName": "Warm Alabaster", "canonical": "oklch(0.975 0.015 95)", "tonalRamp": ["oklch(0.15 0.005 95)", "oklch(0.30 0.008 95)", "oklch(0.50 0.010 95)", "oklch(0.70 0.012 95)", "oklch(0.85 0.014 95)", "oklch(0.92 0.015 95)", "oklch(0.96 0.015 95)", "oklch(0.975 0.015 95)"] },
+      "accent": { "role": "accent", "displayName": "Electric Lime", "canonical": "oklch(0.88 0.22 130)", "tonalRamp": ["oklch(0.25 0.10 130)", "oklch(0.40 0.15 130)", "oklch(0.55 0.18 130)", "oklch(0.70 0.20 130)", "oklch(0.80 0.22 130)", "oklch(0.88 0.22 130)", "oklch(0.92 0.18 130)", "oklch(0.96 0.12 130)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headlines and statistics only." },
+      "body": { "displayName": "Body", "purpose": "Default body text and paragraphs." }
+    },
+    "shadows": [
+      { "name": "interactive-match-glow", "value": "0 20px 60px -20px rgba(24, 32, 37, 0.25)", "purpose": "Lift interactive cards on hover." }
+    ],
+    "motion": [
+      { "name": "ease-out-scale", "value": "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Smooth scale animation on hover." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "375px" },
+      { "name": "tablet", "value": "768px" },
+      { "name": "desktop", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Used for main calls to action like 'Post a job' or 'Upload resume'.",
+      "html": "<button class=\"ds-btn-primary\">Upload your resume</button>",
+      "css": ".ds-btn-primary { background: #182025; color: #faf7f2; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; padding: 12px 24px; border: none; border-radius: 9999px; cursor: pointer; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { background: oklch(0.25 0.02 250); transform: scale(1.05); box-shadow: 0 10px 20px rgba(24, 32, 37, 0.15); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Used for alternate/fallback options like 'Build my profile'.",
+      "html": "<button class=\"ds-btn-secondary\">I'm job hunting</button>",
+      "css": ".ds-btn-secondary { background: transparent; color: #182025; border: 1px solid rgba(24, 32, 37, 0.2); font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; padding: 12px 24px; border-radius: 9999px; cursor: pointer; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-secondary:hover { background: oklch(0.93 0.02 95); border-color: rgba(24, 32, 37, 0.4); transform: scale(1.05); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Editorial Directory",
+    "overview": "The visual system of Fitboard rejects standard, over-saturated tech SaaS templates. It adopts an editorial aesthetic reminiscent of a physical catalog or newspaper directory. The interface uses a warm cream base, ink-black text and borders, spacious layouts, and a single electric-lime accent color to indicate matching metrics.",
+    "keyCharacteristics": [
+      "Warm neutral backgrounds combined with high-contrast ink-black typography.",
+      "Thin borders for structure instead of heavy gradients or decorative shadows.",
+      "Generous white space and clear information hierarchy.",
+      "Perfect pill shapes for buttons, tags, and interactive elements.",
+      "Fluid micro-animations to enhance state changes and reveal sequences."
+    ],
+    "rules": [
+      { "name": "The 10% Accent Rule", "body": "Electric lime is used exclusively on <=10% of any given screen. Its rarity makes it an immediate anchor for candidate-job match metrics.", "section": "colors" },
+      { "name": "The Italic Emphasis Rule", "body": "Italic serif styling is used selectively within display typography to highlight key differentiators and key positioning words.", "section": "typography" },
+      { "name": "The Elevation Response Rule", "body": "Shadows never exist statically on basic layout items. They appear only on floating elements or key interactive cards responding to state changes (hover/focus).", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Instrument Serif for hero headings, display statistics, and similarity scoring numbers.",
+      "Do ensure all body copy is high contrast against the warm cream background.",
+      "Do apply perfect pill shapes to all buttons and action tags.",
+      "Do respect the 10% Accent Rule when applying the Electric Lime color."
+    ],
+    "donts": [
+      "Don't use border-left or border-right greater than 1px as a colored stripe.",
+      "Don't use gradient text under any circumstances.",
+      "Don't use glassmorphism blurs decoratively on standard page sections.",
+      "Don't use tiny uppercase kickers as standard eyebrows above every single header.",
+      "Don't use diagonal stripe backgrounds or decorative grid backgrounds.",
+      "Don't use card corners with a border-radius greater than 16px."
+    ]
+  }
+}

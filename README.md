@@ -1,73 +1,36 @@
-# Fitboard - Job Matching Platform
-
-A modern job matching platform that uses skill-vector algorithms to match candidates with jobs based on weighted cosine similarity. Built with TanStack Start, React, and Tailwind CSS.
-
-## Features
-
-- **Resume Parsing**: PDF/DOCX → structured JSON via LLM extraction
-- **Skill-Vector Scoring**: Weighted cosine similarity for objective candidate-job matching
-- **Kanban Pipeline**: Track applications from Applied → Offered
-- **Interview Scheduling**: Calendar sync and email notifications
-- **Real-time Matching**: Instant fit scores for every application
-
-## Tech Stack
-
-- **Framework**: TanStack Start (React SSR)
-- **Styling**: Tailwind CSS with custom design system
-- **UI Components**: Radix UI primitives
-- **State Management**: TanStack Query
-- **Routing**: TanStack Router (file-based)
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js 18+
-- npm or bun
-
-### Installation
-
-```bash
-npm install
-```
-
-### Development
+First, run the development server:
 
 ```bash
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-Visit `http://localhost:8080` to see the application.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### Build
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-```bash
-npm run build
-```
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Project Structure
+## Learn More
 
-```
-src/
-├── components/ui/    # Reusable UI components
-├── routes/          # File-based routing
-│   ├── __root.tsx   # Root layout
-│   └── index.tsx     # Home page
-├── styles.css       # Global styles and design system
-├── router.tsx       # Router configuration
-└── server.ts        # SSR entry point
-```
+To learn more about Next.js, take a look at the following resources:
 
-## Routing
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-This project uses TanStack Start's file-based routing:
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-| File | URL |
-| --- | --- |
-| `index.tsx` | `/` |
-| `about.tsx` | `/about` |
-| `users/$id.tsx` | `/users/:id` (dynamic) |
+## Deploy on Vercel
 
-## License
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-MIT
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
