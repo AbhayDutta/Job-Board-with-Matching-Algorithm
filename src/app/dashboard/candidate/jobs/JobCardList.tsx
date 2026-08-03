@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Calendar, MapPin, IndianRupee, Search, SlidersHorizontal, Briefcase, Bookmark, BookmarkCheck, RefreshCw, Loader2, Heart, X } from "lucide-react";
+import { Calendar, MapPin, IndianRupee, Search, SlidersHorizontal, Briefcase, Bookmark, BookmarkCheck, RefreshCw, Loader2, Heart, X, Mail, ExternalLink, Award } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import ApplyButton from "./ApplyButton";
 import MatchScoreBadge from "@/components/MatchScoreBadge";
@@ -16,6 +16,7 @@ interface Job {
   company: string;
   location: string;
   salary: string;
+  isPremium?: boolean;
   skillsRequired: string[];
   skillsNiceToHave: string[];
   createdAt: Date | string;
@@ -25,11 +26,20 @@ interface Job {
 interface JobCardListProps {
   jobs: Job[];
   appliedJobIds: string[];
+  userApplicationsMap?: Record<
+    string,
+    {
+      status: string;
+      interviewDate: Date | null;
+      joiningDate?: Date | string | null;
+      noticePeriod?: string | null;
+    }
+  >;
   candidateSkillsLength: number;
   initialBookmarkedJobIds: string[];
 }
 
-export default function JobCardList({ jobs, appliedJobIds, candidateSkillsLength, initialBookmarkedJobIds }: JobCardListProps) {
+export default function JobCardList({ jobs, appliedJobIds, userApplicationsMap = {}, candidateSkillsLength, initialBookmarkedJobIds }: JobCardListProps) {
   const [activeTab, setActiveTab] = useState<"explore" | "portfolio">("explore");
   const [searchQuery, setSearchQuery] = useState("");
   const [minScore, setMinScore] = useState(0);
@@ -468,27 +478,37 @@ export default function JobCardList({ jobs, appliedJobIds, candidateSkillsLength
         initial="hidden"
         animate="visible"
         exit={{ opacity: 0, y: shouldReduceMotion ? 0 : -10 }}
-        whileHover={shouldReduceMotion ? {} : { y: -3, boxShadow: "0 12px 30px -10px rgba(0,0,0,0.04)" }}
-        className="rounded-2xl border border-border/80 bg-card p-6 shadow-xs flex flex-col justify-between min-h-[380px] text-left transition-all duration-300 relative group"
+        whileHover={shouldReduceMotion ? {} : { y: -2, boxShadow: "0 20px 50px -12px oklch(0.18 0.02 250 / 0.14)" }}
+        className="group rounded-2xl border border-border bg-card p-6 shadow-match-glow transition-all hover:shadow-match-glow-hover hover:border-foreground/30 flex flex-col justify-between text-left relative"
       >
-        <div className="space-y-4.5">
+        <div className="space-y-4">
           {/* Header Row: Logo, Title, Badges */}
-          <div className="flex items-start justify-between gap-4 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 border-b border-border pb-5">
             <div className="flex items-start gap-4 min-w-0">
               {getCompanyLogo(job.company)}
               <div className="min-w-0 space-y-1">
-                <h3 className="font-sans font-bold text-[16px] md:text-[17px] leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                <h3 className="font-serif text-[22px] md:text-[24px] font-normal text-foreground leading-[1.1] group-hover:text-primary transition-colors line-clamp-2">
                   {job.title}
                 </h3>
-                <p className="text-[11px] font-bold tracking-wider text-muted-foreground/80 uppercase font-sans">
+                <p className="text-[15px] font-medium text-muted-foreground">
                   {job.company}
                 </p>
               </div>
             </div>
             
             {/* Badges Column on Right */}
-            <div className="flex flex-col items-end shrink-0 gap-1.5 pt-0.5">
+            <div className="flex flex-wrap items-center sm:flex-col sm:items-end shrink-0 gap-2 pt-0.5">
+              {job.isPremium && (
+                <span className="rounded-full px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider font-mono bg-gradient-to-r from-amber-400 to-yellow-500 text-black border border-amber-300 shadow-xs flex items-center gap-1">
+                  ⚡ Premium
+                </span>
+              )}
               {candidateSkillsLength > 0 && <MatchScoreBadge score={job.score} />}
+              {userApplicationsMap[job.id] && (
+                <span className="rounded-full px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider bg-foreground text-background">
+                  Status: {userApplicationsMap[job.id].status}
+                </span>
+              )}
               {(() => {
                 const badge = getPlatformBadge(job.description);
                 if (badge) {
@@ -503,22 +523,85 @@ export default function JobCardList({ jobs, appliedJobIds, candidateSkillsLength
             </div>
           </div>
 
-          {/* Location row */}
-          <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-muted-foreground/90 font-sans tracking-wide">
-            <MapPin className="h-4 w-4 text-muted-foreground/75" /> {locationUpper}
-          </div>
-
-          {/* Grid attributes (Yo Job Style - Clean Spacing) */}
-          <div className="flex justify-between items-center py-2 text-[12.5px] font-bold text-foreground font-sans border-y border-border/25">
-            <span className="text-left shrink-0">{seniority}</span>
-            <span className="text-center shrink-0">{jobType}</span>
-            <span className="text-right shrink-0">{job.salary}</span>
+          {/* Metadata Details Row (Matches Recruiter JobCard) */}
+          <div className="flex flex-wrap items-center gap-5 text-[12px] md:text-[13px] text-muted-foreground font-mono">
+            <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> {locationUpper}</span>
+            <span className="flex items-center gap-1.5"><IndianRupee className="h-3.5 w-3.5" /> {job.salary}</span>
+            <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {seniority} • {jobType}</span>
           </div>
 
           {/* Description snippet */}
-          <p className="text-[13px] text-foreground/85 leading-relaxed font-sans line-clamp-3 whitespace-pre-wrap">
+          <p className="text-[15px] text-foreground/90 leading-[1.5] font-sans line-clamp-3 whitespace-pre-wrap">
             {job.description.replace(/^\[Source: [^\]]+\]\s*/, "")}
           </p>
+
+          {/* Candidate Interview Banner & Direct Actions */}
+          {userApplicationsMap[job.id]?.status === "INTERVIEWED" && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 space-y-2 text-xs text-foreground">
+              <div className="flex items-center justify-between font-bold text-amber-600 dark:text-amber-400 font-mono">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" /> Interview Scheduled
+                </span>
+                {userApplicationsMap[job.id].interviewDate && (
+                  <span className="text-[11px] font-bold">
+                    {new Date(userApplicationsMap[job.id].interviewDate!).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+                A calendar invitation with Google Meet details has been sent to your email.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <a
+                  href="https://mail.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider font-mono hover:bg-accent hover:text-black transition-all cursor-pointer"
+                >
+                  <Mail className="h-3.5 w-3.5" /> Open Gmail
+                </a>
+                <a
+                  href="https://calendar.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider font-mono hover:bg-secondary text-foreground transition-all cursor-pointer"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" /> Google Calendar
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Candidate Offered Banner & Notice Period Details */}
+          {userApplicationsMap[job.id]?.status === "OFFERED" && (
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 space-y-2 text-xs text-foreground">
+              <div className="flex items-center justify-between font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                <span className="flex items-center gap-1.5">
+                  <Award className="h-4 w-4" /> 🎉 Official Offer Letter Extended
+                </span>
+                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9.5px] uppercase font-bold text-emerald-700 dark:text-emerald-300">
+                  Offered
+                </span>
+              </div>
+              <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+                Congratulations! {job.company} has extended an official employment offer for {job.title}.
+              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-emerald-500/20 text-[11px] font-mono">
+                <span>Joining Date: <strong>{userApplicationsMap[job.id].joiningDate ? new Date(userApplicationsMap[job.id].joiningDate!).toLocaleDateString() : "Immediate"}</strong></span>
+                <span>Notice Period: <strong>{userApplicationsMap[job.id].noticePeriod || "15 Days"}</strong></span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <a
+                  href="https://mail.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 text-white px-3.5 py-1.5 text-[10.5px] font-bold uppercase tracking-wider font-mono hover:bg-emerald-500 transition-all cursor-pointer"
+                >
+                  <Mail className="h-3.5 w-3.5" /> View Offer in Gmail
+                </a>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer Row: Tags, Date, Actions */}
@@ -652,13 +735,42 @@ export default function JobCardList({ jobs, appliedJobIds, candidateSkillsLength
         <button
           type="button"
           onClick={() => setActiveTab("portfolio")}
-          className={`cursor-pointer px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all duration-300 flex items-center gap-2 select-none active:scale-[0.98] ${
+          className={`cursor-pointer px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all duration-300 flex items-center gap-2 select-none active:scale-[0.98] relative ${
             activeTab === "portfolio"
               ? "bg-foreground text-background shadow-sm font-bold"
               : "text-muted-foreground hover:text-foreground hover:bg-secondary/45 font-medium"
           }`}
         >
           <BookmarkCheck className="h-4 w-4" /> Bookmarked & Applied
+          {(() => {
+            const interviewedCount = Object.values(userApplicationsMap).filter(
+              (app) => app.status === "INTERVIEWED"
+            ).length;
+            const appliedCount = Object.keys(userApplicationsMap).length;
+
+            if (interviewedCount > 0) {
+              return (
+                <span className="inline-flex items-center gap-1.5 ml-1 rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black text-black uppercase tracking-wider font-mono shadow-xs animate-bounce">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-black opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-black"></span>
+                  </span>
+                  Interviewed!
+                </span>
+              );
+            }
+
+            if (appliedCount > 0) {
+              return (
+                <span className="relative flex h-2.5 w-2.5 ml-0.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[oklch(0.88_0.22_130)] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[oklch(0.88_0.22_130)]"></span>
+                </span>
+              );
+            }
+
+            return null;
+          })()}
         </button>
       </div>
 

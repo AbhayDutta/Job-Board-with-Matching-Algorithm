@@ -5,6 +5,8 @@ import { applyToJob } from "@/app/actions/jobs";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowRight, Loader2 } from "lucide-react";
 
+import { toast } from "sonner";
+
 export default function ApplyButton({ jobId, initialApplied }: { jobId: string; initialApplied: boolean }) {
   const [applied, setApplied] = useState(initialApplied);
   const [loading, setLoading] = useState(false);
@@ -17,12 +19,15 @@ export default function ApplyButton({ jobId, initialApplied }: { jobId: string; 
       const res = await applyToJob(jobId);
       if (res.success) {
         setApplied(true);
+        toast.success("Application submitted successfully!");
       } else {
         setError(res.error || "Failed to apply.");
+        toast.error(res.error || "Failed to apply.");
       }
     } catch (err) {
       console.error(err);
       setError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred.");
     } finally {
       setLoading(false);
     }

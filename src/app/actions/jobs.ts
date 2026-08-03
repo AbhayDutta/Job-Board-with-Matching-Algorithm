@@ -89,7 +89,10 @@ export async function getEmployerJobs() {
 export async function getJobs() {
   try {
     const jobs = await db.job.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: [
+        { isPremium: "desc" },
+        { createdAt: "desc" },
+      ],
     });
     return { success: true, jobs };
   } catch (error: any) {
@@ -97,6 +100,7 @@ export async function getJobs() {
     return { success: false, error: "Failed to load jobs." };
   }
 }
+
 
 export async function applyToJob(jobId: string) {
   try {

@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { jobPostingSchema, JobPostingFormData } from "@/lib/validations";
 import { createJob, importJobFromUrl } from "@/app/actions/jobs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +16,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowRight, CheckCircle2, AlertCircle, Loader2, Sparkles, LogOut, Link2, Globe } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
+import ThemeToggle from "@/components/ThemeToggle";
+import UserProfileModal from "@/components/UserProfileModal";
 
 class SkillSoundManager {
   private static ctx: AudioContext | null = null;
@@ -96,13 +101,7 @@ const TECH_STACK = [
 ];
 
 export default function NewJobPage() {
-  const [title, setTitle] = useState("");
-  const [company, setCompany] = useState("");
-  const [location, setLocation] = useState("");
-  const [salary, setSalary] = useState("");
-  const [description, setDescription] = useState("");
-  const [skillsRequired, setSkillsRequired] = useState("");
-  const [skillsNiceToHave, setSkillsNiceToHave] = useState("");
+  const { data: session } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -119,6 +118,31 @@ export default function NewJobPage() {
   const [importLoading, setImportLoading] = useState(false);
   const [isImportFocused, setIsImportFocused] = useState(false);
 
+  const router = useRouter();
+  const shouldReduceMotion = useReducedMotion();
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<JobPostingFormData>({
+    resolver: zodResolver(jobPostingSchema),
+    defaultValues: {
+      title: "",
+      company: "",
+      location: "",
+      salary: "",
+      description: "",
+      skillsRequired: "",
+      skillsNiceToHave: "",
+    },
+  });
+
+  const skillsRequired = watch("skillsRequired") || "";
+  const skillsNiceToHave = watch("skillsNiceToHave") || "";
+
   const handleImport = async () => {
     if (!importUrl) {
       toast.error("Please enter a valid job URL to import.");
@@ -129,16 +153,16 @@ export default function NewJobPage() {
     try {
       const res = await importJobFromUrl(importUrl);
       if (res.success && res.job) {
-        setTitle(res.job.title);
-        setCompany(res.job.company);
-        setLocation(res.job.location);
-        setSalary(res.job.salary);
-        setDescription(res.job.description);
+        setValue("title", res.job.title, { shouldValidate: true });
+        setValue("company", res.job.company, { shouldValidate: true });
+        setValue("location", res.job.location, { shouldValidate: true });
+        setValue("salary", res.job.salary, { shouldValidate: true });
+        setValue("description", res.job.description, { shouldValidate: true });
         
         const reqArr = Array.isArray(res.job.skillsRequired) ? (res.job.skillsRequired as string[]) : [];
         const niceArr = Array.isArray(res.job.skillsNiceToHave) ? (res.job.skillsNiceToHave as string[]) : [];
-        setSkillsRequired(reqArr.join(", "));
-        setSkillsNiceToHave(niceArr.join(", "));
+        setValue("skillsRequired", reqArr.join(", "), { shouldValidate: true });
+        setValue("skillsNiceToHave", niceArr.join(", "), { shouldValidate: true });
 
         toast.success("Successfully imported job specifications! Please review and publish.");
         setImportUrl("");
@@ -155,30 +179,26 @@ export default function NewJobPage() {
     }
   };
 
-  const router = useRouter();
-  const shouldReduceMotion = useReducedMotion();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: JobPostingFormData) => {
     setError(null);
     setLoading(true);
 
-    const reqSkills = skillsRequired
+    const reqSkills = data.skillsRequired
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
-    const niceSkills = skillsNiceToHave
+    const niceSkills = (data.skillsNiceToHave || "")
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
     try {
       const res = await createJob({
-        title,
-        company,
-        location,
-        salary,
-        description,
+        title: data.title,
+        company: data.company,
+        location: data.location,
+        salary: data.salary,
+        description: data.description,
         skillsRequired: reqSkills,
         skillsNiceToHave: niceSkills,
       });
@@ -228,14 +248,14 @@ export default function NewJobPage() {
 
     if (isRequired) {
       // Required -> Nice-to-Have
-      setSkillsRequired(prev => removeSkill(prev, techName));
-      setSkillsNiceToHave(prev => addSkill(prev, techName));
+      setValue("skillsRequired", removeSkill(skillsRequired, techName), { shouldValidate: true });
+      setValue("skillsNiceToHave", addSkill(skillsNiceToHave, techName), { shouldValidate: true });
     } else if (isNice) {
       // Nice-to-Have -> Unselected
-      setSkillsNiceToHave(prev => removeSkill(prev, techName));
+      setValue("skillsNiceToHave", removeSkill(skillsNiceToHave, techName), { shouldValidate: true });
     } else {
       // Unselected -> Required
-      setSkillsRequired(prev => addSkill(prev, techName));
+      setValue("skillsRequired", addSkill(skillsRequired, techName), { shouldValidate: true });
     }
   };
 
@@ -256,13 +276,26 @@ export default function NewJobPage() {
               Post a Job
             </Link>
           </nav>
-          <Button
-            variant="ghost"
-            onClick={() => signOut({ callbackUrl: "/" })}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold hover:bg-secondary rounded-full px-4 py-2 transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
-          >
-            <LogOut className="h-4 w-4" /> Sign out
-          </Button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            {session?.user && (
+              <UserProfileModal
+                user={{
+                  id: session.user.id || "employer-id",
+                  email: session.user.email || "employer@fitboard.com",
+                  name: (session.user as any).name || session.user.email?.split("@")[0],
+                  role: session.user.role || "EMPLOYER",
+                }}
+              />
+            )}
+            <Button
+              variant="ghost"
+              onClick={() => signOut({ callbackUrl: "/" })}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold hover:bg-secondary rounded-full px-4 py-2 transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="h-4 w-4" /> Sign out
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -298,7 +331,7 @@ export default function NewJobPage() {
                     <p className="text-xs text-muted-foreground">Redirecting to postings dashboard...</p>
                   </motion.div>
                 ) : (
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                     <AnimatePresence>
                       {error && (
                         <motion.div
@@ -373,44 +406,56 @@ export default function NewJobPage() {
                         <motion.div
                           animate={{
                             scale: isTitleFocused && !shouldReduceMotion ? 1.015 : 1,
-                            borderColor: isTitleFocused ? "var(--color-foreground)" : "var(--color-border)",
+                            borderColor: errors.title ? "var(--color-destructive)" : isTitleFocused ? "var(--color-foreground)" : "var(--color-border)",
                           }}
                           transition={{ duration: 0.2 }}
                           className="rounded-xl border bg-background overflow-hidden"
                         >
                           <Input
                             id="title"
-                            required
                             placeholder="e.g. Senior Frontend Engineer"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
+                            {...register("title")}
                             onFocus={() => setIsTitleFocused(true)}
-                            onBlur={() => setIsTitleFocused(false)}
+                            onBlur={(e) => {
+                              register("title").onBlur(e);
+                              setIsTitleFocused(false);
+                            }}
                             className="h-11 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0 rounded-none shadow-none"
                           />
                         </motion.div>
+                        {errors.title && (
+                          <p className="text-[11.5px] font-medium text-destructive font-sans mt-1">
+                            {errors.title.message}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="company" className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground">Company Name</Label>
                         <motion.div
                           animate={{
                             scale: isCompanyFocused && !shouldReduceMotion ? 1.015 : 1,
-                            borderColor: isCompanyFocused ? "var(--color-foreground)" : "var(--color-border)",
+                            borderColor: errors.company ? "var(--color-destructive)" : isCompanyFocused ? "var(--color-foreground)" : "var(--color-border)",
                           }}
                           transition={{ duration: 0.2 }}
                           className="rounded-xl border bg-background overflow-hidden"
                         >
                           <Input
                             id="company"
-                            required
                             placeholder="e.g. Fitboard Inc."
-                            value={company}
-                            onChange={(e) => setCompany(e.target.value)}
+                            {...register("company")}
                             onFocus={() => setIsCompanyFocused(true)}
-                            onBlur={() => setIsCompanyFocused(false)}
+                            onBlur={(e) => {
+                              register("company").onBlur(e);
+                              setIsCompanyFocused(false);
+                            }}
                             className="h-11 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0 rounded-none shadow-none text-[15px]"
                           />
                         </motion.div>
+                        {errors.company && (
+                          <p className="text-[11.5px] font-medium text-destructive font-sans mt-1">
+                            {errors.company.message}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -420,44 +465,56 @@ export default function NewJobPage() {
                         <motion.div
                           animate={{
                             scale: isLocationFocused && !shouldReduceMotion ? 1.015 : 1,
-                            borderColor: isLocationFocused ? "var(--color-foreground)" : "var(--color-border)",
+                            borderColor: errors.location ? "var(--color-destructive)" : isLocationFocused ? "var(--color-foreground)" : "var(--color-border)",
                           }}
                           transition={{ duration: 0.2 }}
                           className="rounded-xl border bg-background overflow-hidden"
                         >
                           <Input
                             id="location"
-                            required
                             placeholder="e.g. Bengaluru, India (Hybrid)"
-                            value={location}
-                            onChange={(e) => setLocation(e.target.value)}
+                            {...register("location")}
                             onFocus={() => setIsLocationFocused(true)}
-                            onBlur={() => setIsLocationFocused(false)}
+                            onBlur={(e) => {
+                              register("location").onBlur(e);
+                              setIsLocationFocused(false);
+                            }}
                             className="h-11 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0 rounded-none shadow-none text-[15px]"
                           />
                         </motion.div>
+                        {errors.location && (
+                          <p className="text-[11.5px] font-medium text-destructive font-sans mt-1">
+                            {errors.location.message}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="salary" className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground">Salary / Compensation</Label>
                         <motion.div
                           animate={{
                             scale: isSalaryFocused && !shouldReduceMotion ? 1.015 : 1,
-                            borderColor: isSalaryFocused ? "var(--color-foreground)" : "var(--color-border)",
+                            borderColor: errors.salary ? "var(--color-destructive)" : isSalaryFocused ? "var(--color-foreground)" : "var(--color-border)",
                           }}
                           transition={{ duration: 0.2 }}
                           className="rounded-xl border bg-background overflow-hidden"
                         >
                           <Input
                             id="salary"
-                            required
                             placeholder="e.g. ₹18L - ₹24L per annum"
-                            value={salary}
-                            onChange={(e) => setSalary(e.target.value)}
+                            {...register("salary")}
                             onFocus={() => setIsSalaryFocused(true)}
-                            onBlur={() => setIsSalaryFocused(false)}
+                            onBlur={(e) => {
+                              register("salary").onBlur(e);
+                              setIsSalaryFocused(false);
+                            }}
                             className="h-11 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0 rounded-none shadow-none text-[15px]"
                           />
                         </motion.div>
+                        {errors.salary && (
+                          <p className="text-[11.5px] font-medium text-destructive font-sans mt-1">
+                            {errors.salary.message}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -466,22 +523,28 @@ export default function NewJobPage() {
                       <motion.div
                         animate={{
                           scale: isDescriptionFocused && !shouldReduceMotion ? 1.01 : 1,
-                          borderColor: isDescriptionFocused ? "var(--color-foreground)" : "var(--color-border)",
+                          borderColor: errors.description ? "var(--color-destructive)" : isDescriptionFocused ? "var(--color-foreground)" : "var(--color-border)",
                         }}
                         transition={{ duration: 0.2 }}
                         className="rounded-xl border bg-background overflow-hidden"
                       >
                         <Textarea
                           id="description"
-                          required
                           placeholder="Provide a detailed job description, responsibilities, and team expectations..."
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
+                          {...register("description")}
                           onFocus={() => setIsDescriptionFocused(true)}
-                          onBlur={() => setIsDescriptionFocused(false)}
+                          onBlur={(e) => {
+                            register("description").onBlur(e);
+                            setIsDescriptionFocused(false);
+                          }}
                           className="min-h-32 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0 rounded-none shadow-none leading-[1.5] text-[15px] outline-hidden"
                         />
                       </motion.div>
+                      {errors.description && (
+                        <p className="text-[11.5px] font-medium text-destructive font-sans mt-1">
+                          {errors.description.message}
+                        </p>
+                      )}
                     </div>
 
                     {/* Skill Vectors */}
@@ -492,22 +555,28 @@ export default function NewJobPage() {
                       <motion.div
                         animate={{
                           scale: isReqSkillsFocused && !shouldReduceMotion ? 1.015 : 1,
-                          borderColor: isReqSkillsFocused ? "var(--color-foreground)" : "var(--color-border)",
+                          borderColor: errors.skillsRequired ? "var(--color-destructive)" : isReqSkillsFocused ? "var(--color-foreground)" : "var(--color-border)",
                         }}
                         transition={{ duration: 0.2 }}
                         className="rounded-xl border bg-card overflow-hidden"
                       >
                         <Input
                           id="skillsRequired"
-                          required
                           placeholder="e.g. TypeScript, React, PostgreSQL"
-                          value={skillsRequired}
-                          onChange={(e) => setSkillsRequired(e.target.value)}
+                          {...register("skillsRequired")}
                           onFocus={() => setIsReqSkillsFocused(true)}
-                          onBlur={() => setIsReqSkillsFocused(false)}
+                          onBlur={(e) => {
+                            register("skillsRequired").onBlur(e);
+                            setIsReqSkillsFocused(false);
+                          }}
                           className="h-11 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0 rounded-none shadow-none text-[15px]"
                         />
                       </motion.div>
+                      {errors.skillsRequired && (
+                        <p className="text-[11.5px] font-medium text-destructive font-sans mt-1">
+                          {errors.skillsRequired.message}
+                        </p>
+                      )}
                       <p className="text-[12px] text-muted-foreground font-sans">
                         These skills carry heavy weight (vector value) in candidate matching.
                       </p>
@@ -591,10 +660,12 @@ export default function NewJobPage() {
                         <Input
                           id="skillsNiceToHave"
                           placeholder="e.g. Next.js, Docker, AWS"
-                          value={skillsNiceToHave}
-                          onChange={(e) => setSkillsNiceToHave(e.target.value)}
+                          {...register("skillsNiceToHave")}
                           onFocus={() => setIsNiceSkillsFocused(true)}
-                          onBlur={() => setIsNiceSkillsFocused(false)}
+                          onBlur={(e) => {
+                            register("skillsNiceToHave").onBlur(e);
+                            setIsNiceSkillsFocused(false);
+                          }}
                           className="h-11 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0 rounded-none shadow-none text-[15px]"
                         />
                       </motion.div>

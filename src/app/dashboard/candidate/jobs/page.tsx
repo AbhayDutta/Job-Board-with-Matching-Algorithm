@@ -18,12 +18,22 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+import ThemeToggle from "@/components/ThemeToggle";
+import UserProfileModal from "@/components/UserProfileModal";
+import { SignOutButton } from "@/components/SignOutButton";
+
 export default async function CandidateJobsPage() {
   const session = await getSession(authOptions);
 
   if (!session || session.user?.role !== "CANDIDATE") {
     redirect("/login");
   }
+
+  // Load user record
+  const userRecord = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, email: true, name: true, avatarUrl: true, role: true, plan: true },
+  });
 
   // Load candidate profile
   const profile = await db.candidateProfile.findUnique({
@@ -39,9 +49,18 @@ export default async function CandidateJobsPage() {
 
   const userApplications = await db.application.findMany({
     where: { candidateId: session.user.id },
-    select: { jobId: true },
+    select: { jobId: true, status: true, interviewDate: true, joiningDate: true, noticePeriod: true },
   });
   const appliedJobIds = userApplications.map((app) => app.jobId);
+  const userApplicationsMap = userApplications.reduce((acc, app) => {
+    acc[app.jobId] = {
+      status: app.status,
+      interviewDate: app.interviewDate,
+      joiningDate: app.joiningDate,
+      noticePeriod: app.noticePeriod,
+    };
+    return acc;
+  }, {} as Record<string, { status: string; interviewDate: Date | null; joiningDate?: Date | null; noticePeriod?: string | null }>);
 
   const userBookmarks = await db.bookmark.findMany({
     where: { candidateId: session.user.id },
@@ -122,12 +141,11 @@ export default async function CandidateJobsPage() {
               Explore Jobs
             </Link>
           </nav>
-          <Link
-            href="/api/auth/signout"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold hover:bg-secondary rounded-full px-4 py-2 transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
-          >
-            <LogOut className="h-4 w-4" /> Sign out
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            {userRecord && <UserProfileModal user={userRecord} />}
+            <SignOutButton />
+          </div>
         </div>
       </header>
 
@@ -312,6 +330,7 @@ export default async function CandidateJobsPage() {
         <JobCardList
           jobs={jobsWithScores}
           appliedJobIds={appliedJobIds}
+          userApplicationsMap={userApplicationsMap}
           candidateSkillsLength={candidateSkills.length}
           initialBookmarkedJobIds={bookmarkedJobIds}
         />

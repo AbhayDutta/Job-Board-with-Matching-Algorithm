@@ -24,6 +24,7 @@ model User {
   email            String            @unique
   password         String // Hashed password
   role             UserRole          @default(CANDIDATE)
+  plan             String            @default("FREE") // "FREE", "RECRUITER", "CANDIDATE_PRO"
   name             String?
   avatarUrl        String?           // Hashed profile image base64 or URL
   createdAt        DateTime          @default(now())
@@ -32,6 +33,7 @@ model User {
   jobsPosted       Job[]             @relation("EmployerJobs")
   applications     Application[]
   bookmarks        Bookmark[]
+  paymentOrders    PaymentOrder[]
 }
 
 model CandidateProfile {
@@ -54,6 +56,7 @@ model Job {
   company          String
   location         String
   salary           String // e.g. "₹1,999/mo" or range
+  isPremium        Boolean       @default(false)
   skillsRequired   Json // e.g. ["TypeScript", "PostgreSQL"] (weighted must-haves)
   skillsNiceToHave Json // e.g. ["Next.js", "LLM APIs"] (nice-to-haves)
   employerId       String
@@ -62,6 +65,7 @@ model Job {
   bookmarks        Bookmark[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+  paymentOrders    PaymentOrder[]
 }
 
 model Application {
@@ -72,6 +76,10 @@ model Application {
   candidate   User              @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   status      ApplicationStatus @default(APPLIED)
   matchScore  Float? // Left nullable for future matching algorithm
+  interviewDate DateTime?
+  joiningDate DateTime?
+  noticePeriod String?
+  offerLetterNotes String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -88,3 +96,21 @@ model Bookmark {
 
   @@unique([jobId, candidateId])
 }
+
+model PaymentOrder {
+  id          String   @id @default(uuid())
+  orderId     String   @unique // Razorpay Order ID (order_...)
+  paymentId   String?  // Razorpay Payment ID (pay_...)
+  signature   String?  // Razorpay HMAC SHA256 Signature
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId       String?
+  job         Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  type        String   // "PREMIUM_JOB" | "RECRUITER_PLAN" | "CANDIDATE_PRO"
+  amount      Int      // Amount in paise (e.g. 199900 = ₹1,999)
+  currency    String   @default("INR")
+  status      String   @default("CREATED") // "CREATED" | "PAID" | "FAILED"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+

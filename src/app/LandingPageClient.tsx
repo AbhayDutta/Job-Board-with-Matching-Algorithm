@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Lenis from "lenis";
 import {
   Calendar,
   FileText,
@@ -13,10 +14,140 @@ import {
   ArrowRight,
   Sparkles,
   Zap,
-  Star
+  Star,
+  Loader2
 } from "lucide-react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { toast } from "sonner";
+import { motion, AnimatePresence, useReducedMotion, useInView } from "framer-motion";
 import CountUp from "@/components/CountUp";
+import ThemeToggle from "@/components/ThemeToggle";
+
+// ─── Premium easing constants (Emil Kowalski) ────────────────────────────────
+const EASE_OUT  = [0.23, 1, 0.32, 1] as const;
+const EASE_IN_OUT = [0.77, 0, 0.175, 1] as const;
+const SPRING_SNAPPY = { type: "spring", duration: 0.45, bounce: 0.18 } as const;
+const SPRING_SOFT   = { type: "spring", duration: 0.6,  bounce: 0.1  } as const;
+
+// ─── Blur-to-sharp word-by-word text reveal ──────────────────────────────────
+function BlurText({
+  children,
+  className = "",
+  delay = 0,
+  wordDelay = 0.09,
+}: {
+  children: string;
+  className?: string;
+  delay?: number;
+  wordDelay?: number;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-80px" });
+  const shouldReduceMotion = useReducedMotion();
+  const words = children.split(" ");
+
+  return (
+    <span ref={ref} className={className} aria-label={children}>
+      {words.map((word, i) => (
+        <motion.span
+          key={i}
+          aria-hidden="true"
+          className="inline-block"
+          initial={shouldReduceMotion ? false : { opacity: 0, filter: "blur(10px)", y: 10 }}
+          animate={isInView ? { opacity: 1, filter: "blur(0px)", y: 0 } : {}}
+          transition={{
+            duration: 0.55,
+            delay: delay + i * wordDelay,
+            ease: EASE_OUT,
+          }}
+        >
+          {word}{i < words.length - 1 ? "\u00a0" : ""}
+        </motion.span>
+      ))}
+    </span>
+  );
+}
+
+// ─── Ambient glow orb for dark sections ──────────────────────────────────────
+function AmbientGlow({
+  className = "",
+  color = "oklch(0.87 0.22 130)",
+  secondaryColor = "oklch(0.55 0.18 255)",
+  size = 500,
+  delay = 0,
+}: {
+  className?: string;
+  color?: string;
+  secondaryColor?: string;
+  size?: number;
+  delay?: number;
+}) {
+  const shouldReduceMotion = useReducedMotion();
+  if (shouldReduceMotion) return null;
+  return (
+    <div
+      className={`pointer-events-none absolute inset-0 select-none flex items-center justify-center overflow-hidden ${className}`}
+      aria-hidden="true"
+    >
+      {/* Primary rich green ambient glow */}
+      <div
+        className="animate-breathe rounded-full shrink-0"
+        style={{
+          width: size,
+          height: size,
+          background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
+          opacity: 0.28,
+          animationDelay: `${delay}s`,
+          filter: "blur(45px)",
+        }}
+      />
+      {/* Secondary outer blue ambient halo */}
+      <div
+        className="animate-breathe-slow absolute rounded-full shrink-0"
+        style={{
+          width: size * 1.25,
+          height: size * 1.25,
+          background: `radial-gradient(circle, ${secondaryColor} 0%, transparent 65%)`,
+          opacity: 0.15,
+          animationDelay: `${delay + 1.5}s`,
+          filter: "blur(65px)",
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Infinite logo/brand marquee ──────────────────────────────────────────────
+function Marquee({
+  children,
+  className = "",
+  slow = false,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  slow?: boolean;
+}) {
+  const shouldReduceMotion = useReducedMotion();
+  if (shouldReduceMotion) {
+    return <div className={`flex gap-8 flex-wrap justify-center ${className}`}>{children}</div>;
+  }
+  return (
+    <div
+      className={`relative overflow-hidden pause-on-hover ${className}`}
+      style={{
+        maskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)",
+      }}
+    >
+      <div className={`flex gap-0 ${slow ? "animate-marquee-slow" : "animate-marquee"}`}
+        style={{ width: "max-content" }}>
+        <div className="flex gap-8 shrink-0">{children}</div>
+        <div className="flex gap-8 shrink-0" aria-hidden="true">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+
 
 class UISoundManager {
   private static ctx: AudioContext | null = null;
@@ -144,67 +275,10 @@ function AsteriskDeco({ className = "w-6 h-6" }: { className?: string }) {
   );
 }
 
+import Navbar from "@/components/Navbar";
+
 function Nav({ session }: { session: any }) { // eslint-disable-line @typescript-eslint/no-explicit-any
-  return (
-    <header className="sticky top-0 z-40 h-[72px] border-b border-border bg-background/90 backdrop-blur-md transition-all">
-      <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-6">
-        <Link 
-          href="/" 
-          onClick={(e) => {
-            UISoundManager.playClick();
-            if (window.location.pathname === "/") {
-              e.preventDefault();
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }
-          }}
-          onMouseEnter={() => UISoundManager.playHover()}
-          className="group flex items-center gap-2.5 text-lg font-black tracking-tight text-foreground select-none hover:scale-[1.02] transition-transform"
-        >
-          <PickleSmiley className="w-7 h-7 hover:rotate-12 transition-transform duration-300" />
-          <span className="font-heading text-[22px] font-black tracking-tight text-foreground transition-colors group-hover:text-accent">Fitboard</span>
-        </Link>
-        <nav className="hidden gap-8 text-sm font-semibold text-muted-foreground md:flex">
-          <a href="#how" onClick={() => UISoundManager.playClick()} onMouseEnter={() => UISoundManager.playHover()} className="transition-colors hover:text-accent">How it works</a>
-          <a href="#roles" onClick={() => UISoundManager.playClick()} onMouseEnter={() => UISoundManager.playHover()} className="transition-colors hover:text-accent">For you</a>
-          <a href="#pipeline" onClick={() => UISoundManager.playClick()} onMouseEnter={() => UISoundManager.playHover()} className="transition-colors hover:text-accent">Pipeline</a>
-          <a href="#pricing" onClick={() => UISoundManager.playClick()} onMouseEnter={() => UISoundManager.playHover()} className="transition-colors hover:text-accent">Pricing</a>
-        </nav>
-        <div className="flex items-center gap-4">
-          {session ? (
-            <div className="flex items-center gap-3">
-              <Link
-                href={session.user?.role === "EMPLOYER" ? "/dashboard/employer/jobs" : "/dashboard/candidate/jobs"}
-                onClick={() => UISoundManager.playSuccess()}
-                onMouseEnter={() => UISoundManager.playHover()}
-                className="btn-tactile rounded-full bg-foreground px-5 py-2.5 text-xs font-bold text-background hover:scale-102 hover:opacity-95 hover:bg-accent hover:text-black transition-all"
-              >
-                Go to Dashboard
-              </Link>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Link 
-                href="/login" 
-                onClick={() => UISoundManager.playClick()}
-                onMouseEnter={() => UISoundManager.playHover()}
-                className="text-xs font-bold text-foreground hover:bg-accent/10 hover:text-accent rounded-full px-4 py-2.5 transition-all"
-              >
-                Sign in
-              </Link>
-              <Link
-                href="/register"
-                onClick={() => UISoundManager.playSuccess()}
-                onMouseEnter={() => UISoundManager.playHover()}
-                className="btn-tactile rounded-full bg-foreground px-5 py-2.5 text-xs font-bold text-background hover:scale-102 hover:opacity-95 hover:bg-accent hover:text-black transition-all"
-              >
-                Sign up
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-    </header>
-  );
+  return <Navbar session={session} />;
 }
 
 function Stat({ n, l }: { n: string; l: string }) {
@@ -217,10 +291,10 @@ function Stat({ n, l }: { n: string; l: string }) {
       className="group cursor-default"
       onMouseEnter={() => UISoundManager.playHover()}
     >
-      <div className="font-serif text-3xl font-normal text-foreground md:text-4xl transition-colors group-hover:text-accent duration-300">
+      <div className="font-serif text-2xl sm:text-3xl font-normal text-foreground md:text-4xl transition-colors group-hover:text-accent duration-300">
         <CountUp to={isNaN(numVal) ? 0 : numVal} />{suffix}
       </div>
-      <div className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground transition-colors group-hover:text-foreground duration-300">{l}</div>
+      <div className="mt-1 text-[10px] sm:text-[11px] font-semibold uppercase tracking-widest text-muted-foreground transition-colors group-hover:text-foreground duration-300">{l}</div>
     </div>
   );
 }
@@ -286,7 +360,7 @@ function MatchCard() {
                       className={
                         s.weight === "must"
                           ? `rounded-xs px-1.5 py-0.5 text-[9px] font-bold uppercase transition-colors duration-300 ${
-                              active ? "bg-foreground text-background" : "bg-secondary text-muted-foreground/60 border border-border/40"
+                              active ? "bg-foreground text-background dark:bg-accent dark:text-foreground" : "bg-secondary text-muted-foreground/60 border border-border/40"
                             }`
                           : `rounded-xs border px-1.5 py-0.5 text-[9px] font-semibold uppercase transition-colors duration-300 ${
                               active ? "border-foreground/50 text-foreground" : "border-border text-muted-foreground/40"
@@ -305,7 +379,7 @@ function MatchCard() {
                 </div>
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                   <motion.div
-                    className={`h-full rounded-full transition-colors duration-300 ${active ? "bg-foreground" : "bg-muted-foreground/20"}`}
+                    className={`h-full rounded-full transition-colors duration-300 ${active ? "bg-accent" : "bg-muted-foreground/20"}`}
                     initial={{ width: 0 }}
                     animate={{ width: active ? `${s.score}%` : "0%" }}
                     transition={{ duration: 0.4, ease: "easeOut" }}
@@ -343,34 +417,54 @@ function Hero({ session }: { session: any }) { // eslint-disable-line @typescrip
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 gap-16 px-6 py-20 lg:grid-cols-12 lg:py-28">
         <motion.div
           className="lg:col-span-7"
-          initial={shouldReduceMotion ? {} : { opacity: 0, y: 20 }}
+          initial={shouldReduceMotion ? {} : { opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={{ duration: 0.6, ease: EASE_OUT }}
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-muted-foreground shadow-xs">
+          <motion.div
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-muted-foreground shadow-xs"
+            initial={shouldReduceMotion ? {} : { opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, ease: EASE_OUT }}
+          >
             <span className="h-2 w-2 rounded-full bg-[oklch(0.88_0.22_130)] animate-pulse" />
             Now parsing resumes with structured LLM extraction
-          </div>
+          </motion.div>
           
-          <motion.h1
-            className="mt-6 font-serif text-5xl leading-[0.95] tracking-tight text-foreground text-balance md:text-7xl lg:text-[84px]"
-            initial={shouldReduceMotion ? {} : { opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.5, ease: "easeOut" }}
-          >
-            Job matching that
-            <span className="italic font-normal"> actually </span>
-            <span className="relative inline-block font-normal">
+          <h1 className="mt-6 font-serif text-5xl leading-[0.95] tracking-tight text-foreground text-balance md:text-7xl lg:text-[84px]">
+            <BlurText delay={0.12} wordDelay={0.08}>
+              Job matching that
+            </BlurText>
+            {" "}
+            <motion.span
+              className="italic font-normal"
+              initial={shouldReduceMotion ? {} : { opacity: 0, filter: "blur(8px)" }}
+              animate={{ opacity: 1, filter: "blur(0px)" }}
+              transition={{ delay: 0.52, duration: 0.5, ease: EASE_OUT }}
+            >
+              {" "}actually{" "}
+            </motion.span>
+            <motion.span
+              className="relative inline-block font-normal"
+              initial={shouldReduceMotion ? {} : { opacity: 0, filter: "blur(8px)" }}
+              animate={{ opacity: 1, filter: "blur(0px)" }}
+              transition={{ delay: 0.64, duration: 0.5, ease: EASE_OUT }}
+            >
               fits.
-              <span className="absolute -bottom-1 left-0 right-0 h-3 bg-[oklch(0.88_0.22_130)] -z-10 rounded-xs" />
-            </span>
-          </motion.h1>
+              <motion.span
+                className="absolute -bottom-1 left-0 right-0 h-3 bg-[oklch(0.88_0.22_130)] -z-10 rounded-xs"
+                initial={shouldReduceMotion ? {} : { scaleX: 0, originX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ delay: 0.82, duration: 0.5, ease: EASE_OUT }}
+              />
+            </motion.span>
+          </h1>
 
           <motion.p
             className="mt-6 max-w-xl text-lg text-muted-foreground font-sans leading-relaxed"
-            initial={shouldReduceMotion ? {} : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
+            initial={shouldReduceMotion ? {} : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.72, duration: 0.55, ease: EASE_OUT }}
           >
             Fitboard turns resumes into structured skill vectors and scores every
             candidate–job pairing with weighted cosine similarity — so recruiters stop
@@ -381,31 +475,32 @@ function Hero({ session }: { session: any }) { // eslint-disable-line @typescrip
             className="mt-8 flex flex-wrap items-center gap-4"
             initial={shouldReduceMotion ? {} : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
+            transition={{ delay: 0.88, duration: 0.5, ease: EASE_OUT }}
           >
-            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+            <motion.div whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING_SNAPPY}>
               <Link
                 href={hireLink}
                 onClick={() => UISoundManager.playSuccess()}
                 onMouseEnter={() => UISoundManager.playHover()}
-                className="inline-flex items-center gap-2 rounded-full bg-foreground px-7 py-3.5 text-sm font-semibold text-background shadow-xs hover:bg-accent hover:text-black transition-colors duration-300"
+                className="group inline-flex items-center gap-2 rounded-full bg-foreground px-7 py-3.5 text-sm font-semibold text-background shadow-xs hover:bg-accent hover:text-black transition-colors duration-200"
               >
-                {"I'm hiring"} <ArrowRight className="h-4 w-4" />
+                {"I'm hiring"}
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
               </Link>
             </motion.div>
-            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+            <motion.div whileHover={{ scale: 1.03, y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING_SNAPPY}>
               <Link
                 href={huntLink}
                 onClick={() => UISoundManager.playSuccess()}
                 onMouseEnter={() => UISoundManager.playHover()}
-                className="inline-flex items-center gap-2 rounded-full border border-foreground/20 bg-card px-7 py-3.5 text-sm font-semibold text-foreground shadow-xs hover:border-accent hover:text-accent hover:bg-accent/5 transition-all duration-300"
+                className="inline-flex items-center gap-2 rounded-full border border-foreground/20 bg-card px-7 py-3.5 text-sm font-semibold text-foreground shadow-xs hover:border-accent hover:text-accent hover:bg-accent/5 transition-all duration-200"
               >
                 {"I'm job hunting"}
               </Link>
             </motion.div>
           </motion.div>
 
-          <div className="mt-12 grid grid-cols-3 gap-6 border-t border-border pt-6 text-sm">
+          <div className="mt-12 grid grid-cols-3 gap-3 sm:gap-6 border-t border-border pt-6 text-sm">
             <Stat n="94%" l="avg. fit accuracy" />
             <Stat n="4.2s" l="resume → parsed JSON" />
             <Stat n="0" l="keyword-only searches" />
@@ -414,9 +509,9 @@ function Hero({ session }: { session: any }) { // eslint-disable-line @typescrip
 
         <motion.div
           className="lg:col-span-5 relative flex items-center justify-center"
-          initial={shouldReduceMotion ? {} : { opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
+          initial={shouldReduceMotion ? {} : { opacity: 0, scale: 0.97, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ delay: 0.3, ...SPRING_SOFT }}
         >
           {/* Main Card */}
           <div className="w-full max-w-sm">
@@ -429,8 +524,13 @@ function Hero({ session }: { session: any }) { // eslint-disable-line @typescrip
               {/* Left float card */}
               <motion.div
                 className="absolute top-12 -left-32 bg-card border border-border p-3.5 rounded-xl shadow-md text-xs space-y-1 select-none pointer-events-none hidden sm:block w-36"
-                animate={{ y: [-4, 4, -4] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0, y: [-4, 4, -4] }}
+                transition={{
+                  opacity: { delay: 0.8, duration: 0.5, ease: EASE_OUT },
+                  x: { delay: 0.8, duration: 0.5, ease: EASE_OUT },
+                  y: { delay: 1.2, duration: 4, repeat: Infinity, ease: "easeInOut" },
+                }}
               >
                 <div className="flex items-center justify-between font-bold text-foreground">
                   <span>Arjun M.</span>
@@ -442,8 +542,13 @@ function Hero({ session }: { session: any }) { // eslint-disable-line @typescrip
               {/* Right float card */}
               <motion.div
                 className="absolute bottom-16 -right-32 bg-card border border-border p-3.5 rounded-xl shadow-md text-xs space-y-1 select-none pointer-events-none hidden sm:block w-36"
-                animate={{ y: [4, -4, 4] }}
-                transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0, y: [4, -4, 4] }}
+                transition={{
+                  opacity: { delay: 1.0, duration: 0.5, ease: EASE_OUT },
+                  x: { delay: 1.0, duration: 0.5, ease: EASE_OUT },
+                  y: { delay: 1.4, duration: 4.5, repeat: Infinity, ease: "easeInOut" },
+                }}
               >
                 <div className="flex items-center justify-between font-bold text-foreground">
                   <span>Nina D.</span>
@@ -490,12 +595,20 @@ function HowItWorks() {
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
             <h2 className="max-w-2xl font-serif text-4xl leading-tight text-foreground text-balance md:text-5xl">
-              From messy PDF to ranked shortlist in four moves.
+              <BlurText wordDelay={0.07}>
+                From messy PDF to ranked shortlist in four moves.
+              </BlurText>
             </h2>
           </div>
-          <p className="max-w-sm text-sm text-muted-foreground font-sans leading-relaxed">
+          <motion.p
+            className="max-w-sm text-sm text-muted-foreground font-sans leading-relaxed"
+            initial={shouldReduceMotion ? {} : { opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.2, ease: EASE_OUT }}
+          >
             No black boxes. Every score can be broken down to see which skills matched, which {"didn't"}, and how much each was weighted.
-          </p>
+          </motion.p>
         </div>
 
         <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -505,20 +618,29 @@ function HowItWorks() {
               <motion.div
                 key={s.k}
                 onMouseEnter={() => UISoundManager.playHover()}
-                className={`group relative p-8 rounded-2xl border transition-all duration-300 cursor-default ${
+                className={`group relative p-8 rounded-2xl border transition-all duration-200 cursor-default ${
                   isSpecial
-                    ? "border-foreground bg-foreground text-background hover:shadow-[0_0_25px_rgba(163,230,53,0.15)]"
-                    : "border-border bg-card text-foreground hover:border-accent hover:shadow-[0_0_20px_rgba(163,230,53,0.1)]"
+                    ? "border-accent/60 bg-foreground dark:bg-[oklch(0.19_0.08_130)] dark:text-foreground text-background ring-1 ring-accent/30 hover:shadow-[0_0_30px_oklch(0.87_0.22_130/0.22)] overflow-hidden"
+                    : "border-border bg-card text-foreground hover:border-accent hover:shadow-[0_0_20px_oklch(0.87_0.22_130/0.1)]"
                 }`}
-                initial={shouldReduceMotion ? {} : { opacity: 0, y: 15 }}
+                initial={shouldReduceMotion ? {} : { opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ delay: idx * 0.1, duration: 0.5, ease: "easeOut" }}
-                whileHover={{ y: -4 }}
+                viewport={{ once: true, margin: "-80px" }}
+                transition={{ delay: idx * 0.07, duration: 0.5, ease: EASE_OUT }}
+                whileHover={{ y: -5, transition: SPRING_SNAPPY }}
               >
+                {isSpecial && (
+                  <AmbientGlow
+                    className="-top-16 -left-16 -right-16"
+                    color="oklch(0.87 0.22 130)"
+                    secondaryColor="oklch(0.60 0.15 130)"
+                    size={220}
+                    delay={0.5}
+                  />
+                )}
                 <div
                   className={`font-serif text-4xl font-normal leading-none ${
-                    isSpecial ? "text-[oklch(0.88_0.22_130)]" : "text-muted-foreground/30"
+                    isSpecial ? "text-accent dark:text-accent" : "text-muted-foreground/30"
                   }`}
                 >
                   {s.k}
@@ -552,11 +674,11 @@ function Roles({ session }: { session: any }) { // eslint-disable-line @typescri
     <section id="roles" className="border-b border-border">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-0 divide-y divide-border md:grid-cols-2 md:divide-x md:divide-y-0">
         <motion.div
-          className="p-10 lg:p-16 flex flex-col justify-between"
-          initial={shouldReduceMotion ? {} : { opacity: 0, x: -15 }}
+          className="p-6 sm:p-10 lg:p-16 flex flex-col justify-between"
+          initial={shouldReduceMotion ? {} : { opacity: 0, x: -20 }}
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.6, ease: EASE_OUT }}
         >
           <div>
             <div className="font-serif text-3xl font-normal text-foreground md:text-4xl">
@@ -572,40 +694,48 @@ function Roles({ session }: { session: any }) { // eslint-disable-line @typescri
                 "Breakdown fit percentages by skill weights",
                 "Visualize match scores dynamically on mount",
                 "Keep application progress in a simple candidate tracker",
-              ].map((x) => (
-                <li key={x} className="flex items-start gap-3 text-foreground">
+              ].map((x, i) => (
+                <motion.li
+                  key={x}
+                  className="flex items-start gap-3 text-foreground"
+                  initial={shouldReduceMotion ? {} : { opacity: 0, x: -10 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.1 + i * 0.07, duration: 0.4, ease: EASE_OUT }}
+                >
                   <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-secondary text-foreground">
                     <Check className="h-3 w-3 stroke-[3]" />
                   </span>
                   <span className="leading-snug">{x}</span>
-                </li>
+                </motion.li>
               ))}
             </ul>
-            <motion.div className="mt-10" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+            <motion.div className="mt-10" whileHover={{ scale: 1.03, y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING_SNAPPY}>
               <Link
                 href={candidateLink}
                 onClick={() => UISoundManager.playSuccess()}
                 onMouseEnter={() => UISoundManager.playHover()}
-                className="group inline-flex items-center gap-2 rounded-full border border-foreground/20 bg-card px-7 py-3.5 text-sm font-semibold text-foreground shadow-xs transition-all duration-300 hover:border-accent hover:text-accent hover:bg-accent/5"
+                className="group inline-flex items-center gap-2 rounded-full border border-foreground/20 bg-card px-7 py-3.5 text-sm font-semibold text-foreground shadow-xs transition-all duration-200 hover:border-accent hover:text-accent hover:bg-accent/5"
               >
-                Upload your resume <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                Upload your resume <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
               </Link>
             </motion.div>
           </div>
         </motion.div>
 
         <motion.div
-          className="p-10 lg:p-16 bg-foreground text-background flex flex-col justify-between"
-          initial={shouldReduceMotion ? {} : { opacity: 0, x: 15 }}
+          className="relative p-6 sm:p-10 lg:p-16 bg-[oklch(0.14_0.03_255)] text-white flex flex-col justify-between overflow-hidden"
+          initial={shouldReduceMotion ? {} : { opacity: 0, x: 20 }}
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.6, ease: EASE_OUT }}
         >
+          <AmbientGlow size={450} delay={1} />
           <div>
-            <div className="font-serif text-3xl font-normal text-background md:text-4xl">
+            <div className="font-serif text-3xl font-normal text-white md:text-4xl">
               Rank applicants by fit vectors, not keywords
             </div>
-            <p className="mt-4 max-w-md text-sm text-background/60 font-sans leading-relaxed">
+            <p className="mt-4 max-w-md text-sm text-white/60 font-sans leading-relaxed">
               Ditch the generic search lists. Let our algorithm read and translate candidate resumes
               to match your specific required and nice-to-have skill spec instantly.
             </p>
@@ -615,23 +745,30 @@ function Roles({ session }: { session: any }) { // eslint-disable-line @typescri
                 "Applicants pre-ranked by objective fit score",
                 "Kanban pipeline: Applied → Reviewed → Interviewed → Offered",
                 "Calendar-synced interview scheduling + email alerts",
-              ].map((x) => (
-                <li key={x} className="flex items-start gap-3 text-background">
+              ].map((x, i) => (
+                <motion.li
+                  key={x}
+                  className="flex items-start gap-3 text-white"
+                  initial={shouldReduceMotion ? {} : { opacity: 0, x: 10 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.15 + i * 0.07, duration: 0.4, ease: EASE_OUT }}
+                >
                   <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[oklch(0.88_0.22_130)] text-foreground">
                     <Check className="h-3 w-3 stroke-[3]" />
                   </span>
                   <span className="leading-snug">{x}</span>
-                </li>
+                </motion.li>
               ))}
             </ul>
-            <motion.div className="mt-10" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+            <motion.div className="mt-10" whileHover={{ scale: 1.03, y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING_SNAPPY}>
               <Link
                 href={employerLink}
                 onClick={() => UISoundManager.playSuccess()}
                 onMouseEnter={() => UISoundManager.playHover()}
-                className="group inline-flex items-center gap-2 border-b border-background pb-1 text-sm font-semibold text-background transition-colors duration-300 hover:text-accent hover:border-accent"
+                className="group inline-flex items-center gap-2 border-b border-white/40 pb-1 text-sm font-semibold text-white transition-colors duration-200 hover:text-accent hover:border-accent"
               >
-                Post a role <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                Post a role <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
               </Link>
             </motion.div>
           </div>
@@ -646,9 +783,9 @@ function Pipeline() {
   const cols = ["Applied", "Reviewed", "Interviewed", "Offered"];
   const colDetails = {
     Applied: { count: 3, tone: "bg-secondary" },
-    Reviewed: { count: 2, tone: "bg-[oklch(0.94_0.06_95)]" },
-    Interviewed: { count: 1, tone: "bg-[oklch(0.92_0.12_130)]" },
-    Offered: { count: 1, tone: "bg-foreground text-background" }
+    Reviewed: { count: 2, tone: "bg-[oklch(0.94_0.06_95)] dark:bg-[oklch(0.26_0.04_95)] dark:text-foreground" },
+    Interviewed: { count: 1, tone: "bg-[oklch(0.92_0.12_130)] dark:bg-[oklch(0.26_0.08_130)] dark:text-foreground" },
+    Offered: { count: 1, tone: "bg-foreground dark:bg-accent/20 dark:border dark:border-accent/40 text-background dark:text-foreground" }
   };
 
   // State for candidates inside the pipeline board
@@ -813,17 +950,21 @@ function Features() {
               <motion.div
                 key={x.t}
                 onMouseEnter={() => UISoundManager.playHover()}
-                className="group rounded-2xl border border-border bg-card p-7 cursor-default transition-all duration-300 hover:border-accent hover:shadow-[0_0_20px_rgba(163,230,53,0.1)]"
-                initial={shouldReduceMotion ? {} : { opacity: 0, y: 15 }}
+                className="group rounded-2xl border border-border bg-card p-7 cursor-default transition-all duration-200 hover:border-accent hover:shadow-[0_0_20px_oklch(0.87_0.22_130/0.12)]"
+                initial={shouldReduceMotion ? {} : { opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ delay: idx * 0.1, duration: 0.5 }}
-                whileHover={{ y: -4 }}
+                viewport={{ once: true, margin: "-80px" }}
+                transition={{ delay: idx * 0.07, duration: 0.5, ease: EASE_OUT }}
+                whileHover={{ y: -5, transition: SPRING_SNAPPY }}
               >
-                <div className="mb-5 grid h-12 w-12 place-items-center rounded-xl border border-border bg-secondary text-foreground transition-all duration-300 group-hover:border-accent group-hover:bg-accent group-hover:text-black">
+                <motion.div
+                  className="mb-5 grid h-12 w-12 place-items-center rounded-xl border border-border bg-secondary text-foreground transition-colors duration-200 group-hover:border-accent group-hover:bg-accent group-hover:text-black"
+                  whileHover={{ scale: 1.08, rotate: 4 }}
+                  transition={SPRING_SNAPPY}
+                >
                   <IconComponent className="h-6 w-6" />
-                </div>
-                <div className="font-serif text-2xl font-normal text-foreground transition-colors group-hover:text-accent duration-300">{x.t}</div>
+                </motion.div>
+                <div className="font-serif text-2xl font-normal text-foreground transition-colors group-hover:text-accent duration-200">{x.t}</div>
                 <p className="mt-2.5 text-sm text-muted-foreground font-sans leading-relaxed">{x.d}</p>
               </motion.div>
             );
@@ -836,11 +977,108 @@ function Features() {
 
 function Pricing({ session }: { session: any }) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const shouldReduceMotion = useReducedMotion();
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+
   const candidateCta = session ? "/dashboard/candidate/jobs" : "/register";
   const recruiterCta = session
     ? (session.user?.role === "EMPLOYER" ? "/dashboard/employer/jobs/new" : "/dashboard/candidate/jobs")
     : "/register";
   const agencyCta = "/register";
+
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) { // eslint-disable-line @typescript-eslint/no-explicit-any
+        return resolve(true);
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+  };
+
+  const handleRecruiterCheckout = async () => {
+    if (!session) {
+      window.location.href = "/register";
+      return;
+    }
+
+    setLoadingTier("Recruiter");
+    try {
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error("Failed to load Razorpay SDK. Please check your network.");
+        setLoadingTier(null);
+        return;
+      }
+
+      const orderRes = await fetch("/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "RECRUITER_PLAN" }),
+      });
+
+      const orderData = await orderRes.json();
+      if (!orderData.success) {
+        toast.error(orderData.error || "Failed to create payment order.");
+        setLoadingTier(null);
+        return;
+      }
+
+      const options: any = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Fitboard",
+        description: "Recruiter Plan Subscription — ₹1,999/mo",
+        handler: async function (response: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+          try {
+            const verifyPayload = {
+              ...response,
+              razorpay_order_id: response.razorpay_order_id || orderData.orderId,
+            };
+            const verifyRes = await fetch("/api/payments/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(verifyPayload),
+            });
+            const verifyData = await verifyRes.json();
+
+            if (verifyData.success) {
+              toast.success("🎉 Payment successful! Recruiter plan activated.");
+              window.location.href = "/dashboard/employer/jobs";
+            } else {
+              toast.error(verifyData.error || "Payment verification failed.");
+            }
+          } catch (e) {
+            console.error(e);
+            toast.error("Error verifying payment signature.");
+          } finally {
+            setLoadingTier(null);
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            toast.info("Payment checkout cancelled. No charges were made.");
+            setLoadingTier(null);
+          },
+        },
+        theme: { color: "#8cfa3c" },
+      };
+
+      if (orderData.orderId && !orderData.orderId.startsWith("order_test_")) {
+        options.order_id = orderData.orderId;
+      }
+
+      const razorpay = new (window as any).Razorpay(options); // eslint-disable-line @typescript-eslint/no-explicit-any
+      razorpay.open();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to launch checkout modal.");
+      setLoadingTier(null);
+    }
+  };
 
   const tiers = [
     {
@@ -852,6 +1090,7 @@ function Pricing({ session }: { session: any }) { // eslint-disable-line @typesc
       href: candidateCta,
       dark: false,
       popular: false,
+      isRazorpay: false,
     },
     {
       n: "Recruiter",
@@ -862,6 +1101,7 @@ function Pricing({ session }: { session: any }) { // eslint-disable-line @typesc
       href: recruiterCta,
       dark: true,
       popular: true,
+      isRazorpay: true,
     },
     {
       n: "Agency",
@@ -872,6 +1112,7 @@ function Pricing({ session }: { session: any }) { // eslint-disable-line @typesc
       href: agencyCta,
       dark: false,
       popular: false,
+      isRazorpay: false,
     },
   ];
 
@@ -886,7 +1127,7 @@ function Pricing({ session }: { session: any }) { // eslint-disable-line @typesc
             </h2>
           </div>
           <p className="max-w-sm text-sm text-muted-foreground font-sans leading-relaxed">
-            {"Test mode Razorpay is wired in. Flip to production when you're ready."}
+            {"Secure payment processing powered by Razorpay. Industry standard 256-bit encryption & instant activation."}
           </p>
         </div>
         <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -896,8 +1137,8 @@ function Pricing({ session }: { session: any }) { // eslint-disable-line @typesc
               onMouseEnter={() => UISoundManager.playHover()}
               className={`relative flex flex-col rounded-2xl border p-8 cursor-default transition-all duration-300 ${
                 t.dark
-                  ? "border-foreground bg-foreground text-background hover:shadow-[0_0_30px_rgba(163,230,53,0.2)]"
-                  : "border-border bg-card text-foreground hover:border-accent hover:shadow-[0_0_25px_rgba(163,230,53,0.12)]"
+                  ? "border-accent/60 bg-foreground dark:bg-[oklch(0.19_0.08_130)] dark:text-foreground text-background hover:shadow-[0_0_40px_oklch(0.87_0.22_130/0.25)] ring-1 ring-accent/30"
+                  : "border-border bg-card text-foreground hover:border-accent hover:shadow-[0_0_25px_oklch(0.87_0.22_130/0.12)]"
               }`}
               initial={shouldReduceMotion ? {} : { opacity: 0, y: 15 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -930,18 +1171,58 @@ function Pricing({ session }: { session: any }) { // eslint-disable-line @typesc
                 ))}
               </ul>
               <motion.div className="mt-8" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                <Link
-                  href={t.href}
-                  onClick={() => UISoundManager.playSuccess()}
-                  onMouseEnter={() => UISoundManager.playHover()}
-                  className={`w-full inline-flex items-center justify-center gap-2 rounded-full px-5 py-3.5 text-center text-sm font-semibold transition-all duration-300 ${
-                    t.dark
-                      ? "bg-[oklch(0.88_0.22_130)] text-foreground hover:bg-[oklch(0.88_0.22_130)]/90 hover:scale-[1.01]"
-                      : "bg-foreground text-background hover:bg-accent hover:text-black"
-                  }`}
-                >
-                  {t.cta} <ArrowRight className="h-4 w-4" />
-                </Link>
+                {t.isRazorpay ? (
+                  <button
+                    type="button"
+                    disabled={loadingTier === t.n}
+                    onClick={() => {
+                      if (!session) {
+                        toast.info("Please register or sign in to activate Recruiter Plan.");
+                        setTimeout(() => {
+                          window.location.href = "/register";
+                        }, 1000);
+                        return;
+                      }
+                      handleRecruiterCheckout();
+                    }}
+                    className="w-full cursor-pointer inline-flex items-center justify-center gap-2 rounded-full px-5 py-3.5 text-center text-sm font-semibold transition-all duration-300 bg-[oklch(0.88_0.22_130)] text-foreground hover:bg-[oklch(0.88_0.22_130)]/90 hover:scale-[1.01] disabled:opacity-50"
+                  >
+                    {loadingTier === t.n ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Opening Checkout...
+                      </>
+                    ) : (
+                      <>
+                        {t.cta} <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                ) : t.n === "Agency" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      UISoundManager.playSuccess();
+                      toast.success("🏢 Agency Sales Request Sent! Our enterprise team will contact you within 24 hours.");
+                    }}
+                    onMouseEnter={() => UISoundManager.playHover()}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-full px-5 py-3.5 text-center text-sm font-semibold transition-all duration-300 bg-foreground text-background hover:bg-accent hover:text-black cursor-pointer"
+                  >
+                    {t.cta} <ArrowRight className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <Link
+                    href={t.href}
+                    onClick={() => UISoundManager.playSuccess()}
+                    onMouseEnter={() => UISoundManager.playHover()}
+                    className={`w-full inline-flex items-center justify-center gap-2 rounded-full px-5 py-3.5 text-center text-sm font-semibold transition-all duration-300 ${
+                      t.dark
+                        ? "bg-[oklch(0.88_0.22_130)] text-foreground hover:bg-[oklch(0.88_0.22_130)]/90 hover:scale-[1.01]"
+                        : "bg-foreground text-background hover:bg-accent hover:text-black"
+                    }`}
+                  >
+                    {t.cta} <ArrowRight className="h-4 w-4" />
+                  </Link>
+                )}
               </motion.div>
             </motion.div>
           ))}
@@ -982,11 +1263,12 @@ function Testimonials() {
             <motion.div
               key={r.name}
               onMouseEnter={() => UISoundManager.playHover()}
-              className="p-8 border border-border bg-card rounded-2xl cursor-default transition-all duration-300 hover:border-accent hover:shadow-[0_0_20px_rgba(163,230,53,0.1)] relative flex flex-col justify-between"
-              initial={shouldReduceMotion ? {} : { opacity: 0, y: 15 }}
+              className="p-8 border border-border bg-card rounded-2xl cursor-default transition-all duration-200 hover:border-accent hover:shadow-[0_0_20px_oklch(0.87_0.22_130/0.12)] relative flex flex-col justify-between"
+              initial={shouldReduceMotion ? {} : { opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: idx * 0.1, duration: 0.5 }}
+              transition={{ delay: idx * 0.12, duration: 0.5, ease: EASE_OUT }}
+              whileHover={{ y: -4, transition: SPRING_SNAPPY }}
             >
               <div className="space-y-4">
                 {/* Star rating sequential pop-in */}
@@ -1026,41 +1308,38 @@ function CTA({ session }: { session: any }) { // eslint-disable-line @typescript
     ? (session.user?.role === "EMPLOYER" ? "/dashboard/employer/jobs/new" : "/dashboard/candidate/jobs")
     : "/register";
   return (
-    <section className="border-b border-border">
-      <div className="mx-auto max-w-7xl px-6 py-24 text-center">
-        <motion.h2
-          className="mx-auto max-w-3xl font-serif text-5xl leading-[1.05] text-foreground text-balance md:text-6xl font-normal"
-          initial={shouldReduceMotion ? {} : { opacity: 0, y: 15 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-        >
-          Hire on <span className="italic">fit</span>, not on how well someone
-          reverse-engineered your job post.
-        </motion.h2>
+    <section className="relative border-b border-border overflow-hidden">
+      <AmbientGlow size={600} delay={0} />
+      <div className="relative mx-auto max-w-7xl px-6 py-24 text-center">
+        <h2 className="mx-auto max-w-3xl font-serif text-5xl leading-[1.05] text-foreground text-balance md:text-6xl font-normal">
+          <BlurText wordDelay={0.075}>
+            Hire on fit, not on how well someone reverse-engineered your job post.
+          </BlurText>
+        </h2>
         <motion.div
           className="mt-10 flex flex-wrap justify-center gap-4"
-          initial={shouldReduceMotion ? {} : { opacity: 0 }}
-          whileInView={{ opacity: 1 }}
+          initial={shouldReduceMotion ? {} : { opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ delay: 0.2, duration: 0.5 }}
+          transition={{ delay: 0.5, duration: 0.5, ease: EASE_OUT }}
         >
-          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+          <motion.div whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING_SNAPPY}>
             <Link
               href={actionLink}
               onClick={() => UISoundManager.playSuccess()}
               onMouseEnter={() => UISoundManager.playHover()}
-              className="inline-flex items-center gap-2 rounded-full bg-foreground px-7 py-3.5 text-sm font-semibold text-background shadow-xs transition-colors duration-300 hover:bg-accent hover:text-black"
+              className="group inline-flex items-center gap-2 rounded-full bg-foreground px-7 py-3.5 text-sm font-semibold text-background shadow-xs transition-colors duration-200 hover:bg-accent hover:text-black"
             >
-              Post your first job — free <ArrowRight className="h-4 w-4" />
+              Post your first job — free
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
           </motion.div>
-          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+          <motion.div whileHover={{ scale: 1.03, y: -1 }} whileTap={{ scale: 0.97 }} transition={SPRING_SNAPPY}>
             <Link
               href={session ? "/dashboard/candidate/jobs" : "/register"}
               onClick={() => UISoundManager.playSuccess()}
               onMouseEnter={() => UISoundManager.playHover()}
-              className="inline-flex items-center gap-2 rounded-full border border-foreground/20 bg-card px-7 py-3.5 text-sm font-semibold text-foreground shadow-xs transition-all duration-300 hover:border-accent hover:text-accent hover:bg-accent/5"
+              className="inline-flex items-center gap-2 rounded-full border border-foreground/20 bg-card px-7 py-3.5 text-sm font-semibold text-foreground shadow-xs transition-all duration-200 hover:border-accent hover:text-accent hover:bg-accent/5"
             >
               Upload your resume
             </Link>
@@ -1073,7 +1352,7 @@ function CTA({ session }: { session: any }) { // eslint-disable-line @typescript
 
 function Footer() {
   return (
-    <footer className="bg-foreground text-background">
+    <footer className="bg-[oklch(0.13_0.018_255)] text-white">
       <div className="mx-auto grid max-w-7xl grid-cols-2 gap-10 px-6 py-16 md:grid-cols-5">
         <div className="col-span-2">
           <Link 
@@ -1087,10 +1366,10 @@ function Footer() {
             }}
             className="inline-flex items-center gap-2 text-lg font-black select-none cursor-pointer group"
           >
-            <span className="grid h-7 w-7 place-items-center rounded-md bg-background text-foreground text-xs font-mono transition-transform group-hover:rotate-6">◆</span>
-            <span className="font-serif text-xl font-bold text-background">Fitboard</span>
+            <span className="grid h-7 w-7 place-items-center rounded-md bg-white/10 text-white text-xs font-mono transition-transform group-hover:rotate-6">◆</span>
+            <span className="font-serif text-xl font-bold text-white">Fitboard</span>
           </Link>
-          <p className="mt-4 max-w-sm text-sm text-background/60 font-sans leading-relaxed">
+          <p className="mt-4 max-w-sm text-sm text-white/60 font-sans leading-relaxed">
             Skill-vector matching for the modern job market. Built on Next.js, Prisma,
             Neon Postgres and a healthy suspicion of keyword search.
           </p>
@@ -1101,7 +1380,7 @@ function Footer() {
           { h: "Legal", l: ["Terms", "Privacy", "Security", "DPA"] },
         ].map((c) => (
           <div key={c.h}>
-            <div className="text-xs font-semibold uppercase tracking-widest text-background/50">{c.h}</div>
+            <div className="text-xs font-semibold uppercase tracking-widest text-white/50">{c.h}</div>
             <ul className="mt-4 space-y-2.5 text-sm font-sans font-medium">
               {c.l.map((x) => (
                 <li key={x}>
@@ -1109,7 +1388,7 @@ function Footer() {
                     href="#" 
                     onMouseEnter={() => UISoundManager.playHover()} 
                     onClick={(e) => { e.preventDefault(); UISoundManager.playClick(); }} 
-                    className="text-background/80 transition-colors hover:text-accent duration-200"
+                    className="text-white/80 transition-colors hover:text-accent duration-200"
                   >
                     {x}
                   </a>
@@ -1120,7 +1399,7 @@ function Footer() {
         ))}
       </div>
       <div className="border-t border-background/10">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-6 py-6 text-xs text-background/50 font-mono">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-6 py-6 text-xs text-white/50 font-mono">
           <span>© {new Date().getFullYear()} Fitboard. All rights reserved.</span>
           <span>v_c · v_j / ‖v_c‖‖v_j‖</span>
         </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const inter = Inter({
@@ -19,6 +20,15 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: "Fitboard — Job matching that actually fits",
   description: "Fitboard parses resumes, scores candidate–job fit with a skill-vector algorithm, and gives both sides a real pipeline. Stop keyword-searching. Start matching.",
+  openGraph: {
+    title: "Fitboard — Automated Skill-Vector Job Matching Platform",
+    description: "AI-powered job matching algorithm with cosine similarity scoring, resume parsing, Kanban candidate pipelines, and Google Calendar scheduling.",
+    siteName: "Fitboard",
+    type: "website",
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -40,6 +50,7 @@ export default function RootLayout({
         <div className="absolute bottom-[-10%] right-[10%] -z-10 h-[450px] w-[450px] rounded-full bg-indigo-500/8 dark:bg-indigo-500/4 blur-[110px] pointer-events-none" />
 
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );

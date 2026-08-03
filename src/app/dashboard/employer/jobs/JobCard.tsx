@@ -16,6 +16,7 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import Link from "next/link";
 import {
   Users,
   MapPin,
@@ -29,9 +30,13 @@ import {
   Briefcase,
   GraduationCap,
   Sparkles,
+  Kanban,
 } from "lucide-react";
 
 import { BubbleTag, getSkillData, SkillSoundManager } from "@/components/BubbleTag";
+
+import { toast } from "sonner";
+import { Zap } from "lucide-react";
 
 interface JobCardProps {
   job: {
@@ -41,6 +46,7 @@ interface JobCardProps {
     company: string;
     location: string;
     salary: string;
+    isPremium?: boolean;
     skillsRequired: any; // eslint-disable-line @typescript-eslint/no-explicit-any
     skillsNiceToHave: any; // eslint-disable-line @typescript-eslint/no-explicit-any
     createdAt: Date | string;
@@ -116,12 +122,15 @@ export default function JobCard({ job }: JobCardProps) {
 
       if (res.success) {
         setIsEditDialogOpen(false);
+        toast.success("Job posting updated successfully!");
       } else {
         setError(res.error || "Failed to update job posting.");
+        toast.error(res.error || "Failed to update job posting.");
       }
     } catch (err) {
       console.error(err);
       setError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred.");
     } finally {
       setEditLoading(false);
     }
@@ -134,14 +143,109 @@ export default function JobCard({ job }: JobCardProps) {
       const res = await deleteJob(job.id);
       if (res.success) {
         setIsDeleteDialogOpen(false);
+        toast.success("Job posting deleted successfully!");
       } else {
         setError(res.error || "Failed to delete job posting.");
+        toast.error(res.error || "Failed to delete job posting.");
       }
     } catch (err) {
       console.error(err);
       setError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred.");
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const [paymentLoading, setPaymentLoading] = useState(false);
+
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) { // eslint-disable-line @typescript-eslint/no-explicit-any
+        return resolve(true);
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleBoostJob = async () => {
+    setPaymentLoading(true);
+    try {
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error("Failed to load Razorpay SDK. Check connection.");
+        setPaymentLoading(false);
+        return;
+      }
+
+      const orderRes = await fetch("/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "PREMIUM_JOB", jobId: job.id }),
+      });
+
+      const orderData = await orderRes.json();
+      if (!orderData.success) {
+        toast.error(orderData.error || "Failed to create payment order.");
+        setPaymentLoading(false);
+        return;
+      }
+
+      const options: any = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Fitboard",
+        description: `Boost "${job.title}" to Premium Listing`,
+        handler: async function (response: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+          try {
+            const verifyPayload = {
+              ...response,
+              razorpay_order_id: response.razorpay_order_id || orderData.orderId,
+            };
+            const verifyRes = await fetch("/api/payments/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(verifyPayload),
+            });
+            const verifyData = await verifyRes.json();
+
+            if (verifyData.success) {
+              toast.success("Job boosted to Premium listing!");
+              window.location.reload();
+            } else {
+              toast.error(verifyData.error || "Payment verification failed.");
+            }
+          } catch (e) {
+            console.error(e);
+            toast.error("Error verifying payment signature.");
+          } finally {
+            setPaymentLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            toast.info("Payment checkout closed. Job remains standard.");
+            setPaymentLoading(false);
+          },
+        },
+        theme: { color: "#8cfa3c" },
+      };
+
+      if (orderData.orderId && !orderData.orderId.startsWith("order_test_")) {
+        options.order_id = orderData.orderId;
+      }
+
+      const razorpay = new (window as any).Razorpay(options); // eslint-disable-line @typescript-eslint/no-explicit-any
+      razorpay.open();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to launch checkout.");
+      setPaymentLoading(false);
     }
   };
 
@@ -151,15 +255,49 @@ export default function JobCard({ job }: JobCardProps) {
         {/* Header Block */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 border-b border-border pb-5">
           <div className="space-y-1">
-            <h3 className="font-serif text-[22px] md:text-[24px] font-normal text-foreground leading-[1.1]">{job.title}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-serif text-[22px] md:text-[24px] font-normal text-foreground leading-[1.1]">{job.title}</h3>
+              {job.isPremium && (
+                <span className="rounded-full px-2.5 py-0.5 text-[9.5px] font-black uppercase tracking-wider font-mono bg-gradient-to-r from-amber-400 to-yellow-500 text-black border border-amber-300 shadow-xs flex items-center gap-1">
+                  ⚡ Premium
+                </span>
+              )}
+            </div>
             <p className="text-[15px] font-medium text-muted-foreground">
               {job.company}
             </p>
           </div>
           
           {/* Action Row */}
-          <div className="flex items-center gap-2 self-start">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3.5 py-1.5 text-xs font-semibold text-foreground mr-1">
+          <div className="flex flex-wrap items-center gap-2 self-start">
+            {!job.isPremium && (
+              <button
+                type="button"
+                disabled={paymentLoading}
+                onClick={handleBoostJob}
+                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 text-black px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider hover:opacity-90 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                {paymentLoading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Processing...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-3.5 w-3.5 fill-black" /> Boost Job (₹499)
+                  </>
+                )}
+              </button>
+            )}
+
+            <Link
+              href={`/dashboard/employer/jobs/${job.id}`}
+              className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background hover:bg-accent hover:text-black transition-all"
+            >
+              <Kanban className="h-3.5 w-3.5" />
+              Manage Kanban
+            </Link>
+
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3.5 py-1.5 text-xs font-semibold text-foreground">
               <Users className="h-3.5 w-3.5" />
               {job.applications.length} applicant{job.applications.length !== 1 && "s"}
             </span>

@@ -27,7 +27,10 @@ import {
   User,
 } from "lucide-react";
 
+import { toast } from "sonner";
 import { BubbleTag, getSkillData, SkillSoundManager } from "@/components/BubbleTag";
+
+import ResumeDropzone from "@/components/ResumeDropzone";
 
 interface ProfilePanelProps {
   initialProfile: {
@@ -131,22 +134,27 @@ export default function ProfilePanel({ initialProfile }: ProfilePanelProps) {
         setEditExperience(res.profile?.experience.join("\n") || "");
 
         if (res.fallback) {
+          const msg = res.error || "File uploaded, but could not auto-extract details. Please enter them manually.";
           setUploadMessage({
             type: "error",
-            text: res.error || "File uploaded, but could not auto-extract details. Please enter them manually.",
+            text: msg,
           });
+          toast.error(msg);
         } else {
           setUploadMessage({
             type: "success",
             text: "Resume uploaded and auto-parsed successfully with Gemini!",
           });
+          toast.success("Resume uploaded and parsed successfully!");
         }
         router.refresh();
       } else {
+        const msg = res.error || "Failed to process resume.";
         setUploadMessage({
           type: "error",
-          text: res.error || "Failed to process resume.",
+          text: msg,
         });
+        toast.error(msg);
       }
     } catch (err) {
       console.error(err);
@@ -154,6 +162,7 @@ export default function ProfilePanel({ initialProfile }: ProfilePanelProps) {
         type: "error",
         text: "An unexpected error occurred during upload.",
       });
+      toast.error("An unexpected error occurred during upload.");
     } finally {
       setUploading(false);
     }
@@ -189,13 +198,16 @@ export default function ProfilePanel({ initialProfile }: ProfilePanelProps) {
           type: "success",
           text: "Profile updated successfully!",
         });
+        toast.success("Candidate profile updated successfully!");
         router.refresh();
       } else {
         setSaveError(res.error || "Failed to update profile.");
+        toast.error(res.error || "Failed to update profile.");
       }
     } catch (err) {
       console.error(err);
       setSaveError("An unexpected error occurred.");
+      toast.error("An unexpected error occurred.");
     } finally {
       setSaveLoading(false);
     }
@@ -406,61 +418,21 @@ export default function ProfilePanel({ initialProfile }: ProfilePanelProps) {
 
       {/* Resume Dropzone card */}
       <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-match-glow space-y-4">
-        <h3 className="font-serif text-lg font-normal text-foreground">Upload Resume PDF</h3>
+        <h3 className="font-serif text-lg font-normal text-foreground">Resume Skill Vector Uploader</h3>
         <p className="text-xs text-muted-foreground font-sans leading-relaxed">
-          Upload a fresh copy of your resume to automatically recalculate vectors.
+          Upload or drop a fresh resume copy (PDF/DOCX) to recalculate candidate matching vectors.
         </p>
 
-        <div
-          onDragEnter={handleDrag}
-          onDragOver={handleDrag}
-          onDragLeave={handleDrag}
-          onDrop={handleDrop}
-          className={`h-36 rounded-xl border border-dashed flex flex-col items-center justify-center p-4 text-center transition-all ${
-            dragActive
-              ? "border-foreground bg-secondary/40 shadow-xs"
-              : "border-border bg-background hover:bg-secondary/15 hover:border-border/80"
-          }`}
-        >
-          {uploading ? (
-            <div className="space-y-2">
-              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
-              <p className="text-xs font-semibold text-foreground">Parsing with Gemini...</p>
-            </div>
-          ) : (
-            <label className="cursor-pointer space-y-2 w-full h-full flex flex-col items-center justify-center">
-              <input
-                type="file"
-                className="hidden"
-                accept=".pdf,.docx,.doc"
-                onChange={handleFileInput}
-              />
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-muted-foreground">
-                <Upload className="h-4.5 w-4.5" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-foreground">Upload your resume</p>
-                <p className="text-[9px] text-muted-foreground mt-0.5 font-mono uppercase tracking-wider">
-                  PDF, DOCX up to 10MB
-                </p>
-              </div>
-            </label>
-          )}
-        </div>
-
-        {uploadMessage && (
-          <div
-            className={`rounded-xl p-3 text-xs border font-medium flex items-start gap-2 ${
-              uploadMessage.type === "success"
-                ? "bg-accent/10 text-foreground border-accent/30"
-                : "bg-destructive/10 text-destructive border-destructive/20"
-            }`}
-          >
-            {uploadMessage.type === "success" && <Check className="h-4 w-4 shrink-0 stroke-[2.5]" />}
-            {uploadMessage.type === "error" && <FileText className="h-4 w-4 shrink-0" />}
-            <span className="leading-snug">{uploadMessage.text}</span>
-          </div>
-        )}
+        <ResumeDropzone
+          currentResumeUrl={profile?.resumeUrl}
+          onSuccess={(updatedProfile) => {
+            setProfile(updatedProfile ? { ...updatedProfile, name: profile?.name || "Candidate" } : null);
+            setEditSkills(updatedProfile?.skills.join(", ") || "");
+            setEditEducation(updatedProfile?.education.join("\n") || "");
+            setEditExperience(updatedProfile?.experience.join("\n") || "");
+            router.refresh();
+          }}
+        />
       </div>
     </div>
   );

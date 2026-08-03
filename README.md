@@ -64,7 +64,31 @@ DATABASE_URL=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=
 GEMINI_API_KEY=
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_WEBHOOK_SECRET=
+NEXT_PUBLIC_RAZORPAY_KEY_ID=
 ```
+
+---
+
+## Razorpay Payment Integration (Test Mode)
+
+Fitboard features a secure, hardened payment integration via Razorpay running strictly in **Test Mode** for premium job listing boosts and recruiter subscription plan upgrades.
+
+### Security & Verification Standard
+- **Server-Side Order Creation**: All Razorpay orders are generated via authenticated API `/api/payments/create-order`.
+- **HMAC-SHA256 Signature Verification**: Payment receipts and webhooks are verified server-side via Razorpay signature verification (`/api/payments/verify` and `/api/payments/webhook`).
+- **Webhook Idempotency**: Duplicate webhook triggers for the same `order_id` check `PaymentOrder.status` and return an idempotent response without double-updating database states.
+
+### Demo Test Credentials
+- **Success Test Card**: `4111 1111 1111 1111` | Any future Exp (e.g., `12/30`) | Any 3-digit CVV (e.g., `123`) | OTP: `123456`
+- **Failure/Declined Test Card**: `4000 0000 0000 0002` | Any future Exp | Any CVV
+
+### Database Field Updates
+- **Premium Job Boost**: Updates `Job.isPremium = true` and ranks the boosted job at the top of candidate feeds with a `⚡ Premium` badge.
+- **Recruiter Subscription**: Updates `User.plan = "RECRUITER"`.
+- **Order Audit Trail**: Records transaction state (`CREATED` → `PAID`) in `PaymentOrder` table with `orderId`, `paymentId`, and `signature`.
 
 ---
 
@@ -72,6 +96,7 @@ GEMINI_API_KEY=
 
 - **Resume parsing** — PDF/DOCX → structured JSON via LLM
 - **Skill-vector scoring** — Weighted cosine similarity, explainable and tunable
+- **Razorpay Payments** — Premium job boosts & recruiter subscription checkout in Test Mode
 - **Kanban pipeline** — Applied → Reviewed → Interviewed → Offered
 - **Two-sided platform** — Separate dashboards for candidates and employers
 - **Match score breakdown** — Per-skill weights visible on every application
@@ -79,3 +104,4 @@ GEMINI_API_KEY=
 ---
 
 Built by [Abhay Dutta](https://github.com/AbhayDutta)
+
