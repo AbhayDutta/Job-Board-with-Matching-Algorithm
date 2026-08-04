@@ -20,9 +20,17 @@ const providers: any[] = [
       }
 
       try {
-        const email = credentials.email.toLowerCase().trim();
-        const user = await db.user.findUnique({
-          where: { email },
+        const rawEmail = credentials.email.trim();
+        const lowerEmail = rawEmail.toLowerCase();
+
+        const user = await db.user.findFirst({
+          where: {
+            OR: [
+              { email: rawEmail },
+              { email: lowerEmail },
+              { email: { equals: lowerEmail, mode: "insensitive" } },
+            ],
+          },
         });
 
         if (!user || !user.password) {
