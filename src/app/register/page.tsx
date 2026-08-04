@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,7 +22,19 @@ export default function RegisterPage() {
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
   const router = useRouter();
+  const { data: session, status } = useSession();
   const shouldReduceMotion = useReducedMotion();
+
+  // If user is already authenticated, redirect them directly to dashboard
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      if (session.user.role === "EMPLOYER") {
+        router.push("/dashboard/employer/jobs");
+      } else {
+        router.push("/dashboard/candidate/jobs");
+      }
+    }
+  }, [session, status, router]);
 
   const {
     register,
@@ -58,9 +70,23 @@ export default function RegisterPage() {
         setLoading(false);
       } else {
         setSuccess(true);
-        setTimeout(() => {
+        // Instant Auto-Login after registration so user never needs to sign in manually!
+        const autoSignIn = await signIn("credentials", {
+          email: data.email,
+          password: data.password,
+          redirect: false,
+        });
+
+        if (!autoSignIn?.error) {
+          if (data.role === "EMPLOYER") {
+            router.push("/dashboard/employer/jobs");
+          } else {
+            router.push("/dashboard/candidate/jobs");
+          }
+          router.refresh();
+        } else {
           router.push("/login");
-        }, 1500);
+        }
       }
     } catch (err) {
       console.error(err);

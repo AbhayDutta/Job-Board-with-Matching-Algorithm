@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -19,7 +19,19 @@ export default function LoginPage() {
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
   const router = useRouter();
+  const { data: session, status } = useSession();
   const shouldReduceMotion = useReducedMotion();
+
+  // Auto redirect logged in users directly to dashboard
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      if (session.user.role === "EMPLOYER") {
+        router.push("/dashboard/employer/jobs");
+      } else {
+        router.push("/dashboard/candidate/jobs");
+      }
+    }
+  }, [session, status, router]);
 
   const {
     register,

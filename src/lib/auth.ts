@@ -81,12 +81,20 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!existingUser) {
+            const userName = user.name || user.email.split("@")[0];
             await db.user.create({
               data: {
                 email: user.email,
-                name: user.name || user.email.split("@")[0],
+                name: userName,
                 password: "OAUTH_EXTERNAL_USER",
                 role: "CANDIDATE",
+                candidateProfile: {
+                  create: {
+                    name: userName,
+                    skills: [],
+                    experience: [],
+                  },
+                },
               },
             });
           }
@@ -130,6 +138,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days persistent session
   },
   secret: AUTH_SECRET,
 };
