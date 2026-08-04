@@ -44,17 +44,23 @@ function fallbackRuleBasedParser(resumeText: string): ParsedResume {
         !l.includes("endobj") &&
         !l.includes("/Font") &&
         !l.includes("ReportLab") &&
+        !l.includes("Canva") &&
         !l.includes("<<") &&
         !l.includes(">>") &&
-        !l.includes("/BaseFont")
+        !l.includes("/BaseFont") &&
+        !l.includes("xmlns:") &&
+        !l.includes("rdf:") &&
+        !l.includes("stream") &&
+        !l.includes("xpacket") &&
+        !/^\d+\s+\d+\s+R$/.test(l)
     );
   const education = lines.filter(l => /degree|bachelor|master|university|college|bs|ms|btech|mtech|diploma|education/i.test(l)).slice(0, 4);
   const experience = lines.filter(l => /engineer|developer|manager|intern|analyst|designer|consultant|lead|architect|specialist|experience|work/i.test(l)).slice(0, 5);
 
   return {
     skills: skills.length > 0 ? skills : ["Software Engineering", "Problem Solving", "Web Development"],
-    education: education.length > 0 ? education : ["Relevant Education / Degree"],
-    experience: experience.length > 0 ? experience : ["Software Development & Project Experience"],
+    education: education.length > 0 ? education : ["B.Tech / Higher Education"],
+    experience: experience.length > 0 ? experience : ["Software Engineering & Web Development Experience"],
   };
 }
 
