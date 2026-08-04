@@ -6,9 +6,45 @@ if (typeof global !== "undefined" && !(global as any).DOMMatrix) {
 }
 
 /**
+ * Strips out raw PDF binary tags, stream objects, and font definitions
+ * (e.g. %PDF-1.4, ReportLab header, obj <<, /BaseFont /Helvetica)
+ */
+export function cleanPdfBinaryArtifacts(text: string): string {
+  if (!text) return "";
+
+  const lines = text.split("\n");
+  const filtered = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (
+      trimmed.startsWith("%PDF-") ||
+      trimmed.includes("ReportLab Generated PDF") ||
+      trimmed.includes("obj <<") ||
+      trimmed.includes(">> endobj") ||
+      trimmed.includes("/BaseFont") ||
+      trimmed.includes("/FontDescriptor") ||
+      trimmed.includes("/Type /") ||
+      trimmed.includes("/Filter /") ||
+      trimmed.includes("/MediaBox") ||
+      trimmed.includes("/Encoding /") ||
+      trimmed.includes("/WinAnsiEncoding") ||
+      trimmed.includes("endobj") ||
+      trimmed.includes("stream") ||
+      trimmed.includes("endstream") ||
+      /^[\d\s]+obj$/.test(trimmed) ||
+      /^<<.*>>$/.test(trimmed)
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  return filtered.join("\n").replace(/[^\x20-\x7E\n]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
  * Extracts raw text from a PDF or DOCX file buffer.
- * Uses pdf-parse/node to prevent Vercel fake-worker bundling issues,
- * with guaranteed buffer text fallbacks so extraction never fails.
+ * Filters out raw binary PDF structure tags to ensure clean human text.
  *
  * @param buffer File content buffer.
  * @param mimeType Mime type of the file.
@@ -27,12 +63,14 @@ export async function extractTextFromBuffer(buffer: Buffer, mimeType: string): P
         const result = await parser.getText();
         await parser.destroy();
         if (result.text && result.text.trim().length > 0) {
-          return result.text;
+          const cleanedText = cleanPdfBinaryArtifacts(result.text);
+          if (cleanedText.length > 0) return cleanedText;
         }
       } else if (typeof pdfNode === "function") {
         const result = await pdfNode(buffer);
         if (result && result.text && result.text.trim().length > 0) {
-          return result.text;
+          const cleanedText = cleanPdfBinaryArtifacts(result.text);
+          if (cleanedText.length > 0) return cleanedText;
         }
       }
     } catch (e1: any) {
@@ -46,24 +84,25 @@ export async function extractTextFromBuffer(buffer: Buffer, mimeType: string): P
       if (typeof pdf === "function") {
         const data = await pdf(buffer);
         if (data && data.text && data.text.trim().length > 0) {
-          return data.text;
+          const cleanedText = cleanPdfBinaryArtifacts(data.text);
+          if (cleanedText.length > 0) return cleanedText;
         }
       } else if (pdf.PDFParse) {
         const parser = new pdf.PDFParse({ data: new Uint8Array(buffer) });
         const result = await parser.getText();
         await parser.destroy();
         if (result.text && result.text.trim().length > 0) {
-          return result.text;
+          const cleanedText = cleanPdfBinaryArtifacts(result.text);
+          if (cleanedText.length > 0) return cleanedText;
         }
       }
     } catch (e2: any) {
       console.warn("pdf-parse standard attempt failed:", e2?.message || e2);
     }
 
-    // Attempt 3: Guaranteed ASCII/UTF-8 buffer stream text extraction
-    console.log("Using guaranteed buffer text extraction fallback for PDF");
+    // Attempt 3: Guaranteed clean ASCII text buffer extraction
     const rawText = buffer.toString("utf-8");
-    const cleaned = rawText.replace(/[^\x20-\x7E\n]/g, " ").replace(/\s+/g, " ").trim();
+    const cleaned = cleanPdfBinaryArtifacts(rawText);
     return cleaned || "Candidate Resume Details";
   } else if (
     mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
@@ -74,19 +113,19 @@ export async function extractTextFromBuffer(buffer: Buffer, mimeType: string): P
     try {
       const result = await mammoth.extractRawText({ buffer });
       if (result.value && result.value.trim().length > 0) {
-        return result.value;
+        return result.value.trim();
       }
     } catch (error: any) {
       console.warn("Mammoth DOCX extraction failed:", error?.message || error);
     }
 
     const rawText = buffer.toString("utf-8");
-    const cleaned = rawText.replace(/[^\x20-\x7E\n]/g, " ").replace(/\s+/g, " ").trim();
+    const cleaned = cleanPdfBinaryArtifacts(rawText);
     return cleaned || "Candidate Resume Details";
   }
 
   // General fallback for any file format
   const rawText = buffer.toString("utf-8");
-  const cleaned = rawText.replace(/[^\x20-\x7E\n]/g, " ").replace(/\s+/g, " ").trim();
+  const cleaned = cleanPdfBinaryArtifacts(rawText);
   return cleaned || "Candidate Resume Details";
 }
