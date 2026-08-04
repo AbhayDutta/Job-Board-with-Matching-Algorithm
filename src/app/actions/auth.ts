@@ -14,9 +14,10 @@ const registerSchema = z.object({
 export async function registerUser(formData: z.infer<typeof registerSchema>) {
   try {
     const validatedData = registerSchema.parse(formData);
+    const normalizedEmail = validatedData.email.toLowerCase().trim();
 
     const existingUser = await db.user.findUnique({
-      where: { email: validatedData.email },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
@@ -27,7 +28,8 @@ export async function registerUser(formData: z.infer<typeof registerSchema>) {
 
     const user = await db.user.create({
       data: {
-        email: validatedData.email,
+        email: normalizedEmail,
+        name: validatedData.name,
         password: hashedPassword,
         role: validatedData.role,
         ...(validatedData.role === "CANDIDATE"
