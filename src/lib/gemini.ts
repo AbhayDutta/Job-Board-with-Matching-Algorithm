@@ -6,41 +6,62 @@ interface ParsedResume {
   experience: string[];
 }
 
+const COMMON_SKILLS_KEYWORDS = [
+  "JavaScript", "TypeScript", "React", "Next.js", "Node.js", "Python", "Java", "C++",
+  "C#", "Go", "Rust", "PHP", "Ruby", "HTML", "CSS", "Tailwind", "PostgreSQL", "MySQL",
+  "MongoDB", "Redis", "GraphQL", "REST API", "Docker", "Kubernetes", "AWS", "GCP",
+  "Azure", "Git", "GitHub", "CI/CD", "Linux", "Figma", "UI/UX", "System Design",
+  "Agile", "Scrum", "Machine Learning", "Data Analysis", "SQL", "Express"
+];
+
+function fallbackRuleBasedParser(resumeText: string): ParsedResume {
+  const skills: string[] = [];
+  const textLower = resumeText.toLowerCase();
+
+  for (const kw of COMMON_SKILLS_KEYWORDS) {
+    const kwLower = kw.toLowerCase();
+    if (textLower.includes(kwLower)) {
+      skills.push(kw);
+    }
+  }
+
+  const lines = resumeText.split("\n").map(l => l.trim()).filter(Boolean);
+  const education = lines.filter(l => /degree|bachelor|master|university|college|bs|ms|btech|mtech|diploma/i.test(l)).slice(0, 3);
+  const experience = lines.filter(l => /engineer|developer|manager|intern|analyst|designer|consultant|lead|architect|specialist/i.test(l)).slice(0, 5);
+
+  return { skills, education, experience };
+}
+
 /**
  * Parses raw resume text into a structured JSON schema using Gemini models.
- * Implements a robust failover chain to handle high-demand (503 Service Unavailable) or rate-limit issues.
- *
- * @param resumeText Plain text extracted from the resume.
+ * Implements valid Gemini model names and a rule-based fallback if API key or LLM fails.
  */
 export async function parseResumeWithGemini(resumeText: string): Promise<ParsedResume> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY environment variable is not defined");
-  }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  
-  // Failover chain of models to try in sequence
   const modelsToTry = [
-    "gemini-3.5-flash",
-    "gemini-3.1-flash-lite", // Excellent backup: low-latency, high-availability
-    "gemini-3.1-pro"
+    "gemini-2.5-flash",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-pro",
   ];
-  
-  let lastError: any = null;
 
-  for (const modelName of modelsToTry) {
+  if (apiKey) {
     try {
-      console.log(`[Gemini Parser] Attempting text extraction with model: ${modelName}`);
-      
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: {
-          responseMimeType: "application/json",
-        },
-      });
+      const genAI = new GoogleGenerativeAI(apiKey);
 
-      const prompt = `
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`[Gemini Parser] Attempting text extraction with model: ${modelName}`);
+
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+              responseMimeType: "application/json",
+            },
+          });
+
+          const prompt = `
 You are an expert ATS (Applicant Tracking System) parser.
 Extract the candidate's skills, education history, and professional experience from the raw resume text provided below.
 
@@ -59,38 +80,38 @@ Requirements:
 
 Resume text:
 ${resumeText}
-      `;
+          `;
 
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+          const result = await model.generateContent(prompt);
+          const text = result.response.text();
 
-      if (!text) {
-        throw new Error("Received empty response from Gemini API");
+          if (!text) {
+            continue;
+          }
+
+          let cleanText = text.trim();
+          if (cleanText.startsWith("```")) {
+            cleanText = cleanText.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+          }
+
+          const data = JSON.parse(cleanText);
+
+          const skills = Array.isArray(data.skills) ? data.skills.map((s: any) => String(s).trim()) : [];
+          const education = Array.isArray(data.education) ? data.education.map((e: any) => String(e).trim()) : [];
+          const experience = Array.isArray(data.experience) ? data.experience.map((ex: any) => String(ex).trim()) : [];
+
+          console.log(`[Gemini Parser] Successfully parsed resume using model: ${modelName}`);
+          return { skills, education, experience };
+        } catch (error: any) {
+          console.warn(`[Gemini Parser] Model ${modelName} failed: ${error.message || error}`);
+        }
       }
-
-      // Clean up response if the model returned markdown ticks despite requests
-      let cleanText = text.trim();
-      if (cleanText.startsWith("```")) {
-        cleanText = cleanText.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-      }
-
-      const data = JSON.parse(cleanText);
-
-      // Validate the array types
-      const skills = Array.isArray(data.skills) ? data.skills.map((s: any) => String(s).trim()) : [];
-      const education = Array.isArray(data.education) ? data.education.map((e: any) => String(e).trim()) : [];
-      const experience = Array.isArray(data.experience) ? data.experience.map((ex: any) => String(ex).trim()) : [];
-
-      console.log(`[Gemini Parser] Successfully parsed resume using model: ${modelName}`);
-      return { skills, education, experience };
-
-    } catch (error: any) {
-      console.warn(`[Gemini Parser] Model ${modelName} failed: ${error.message || error}`);
-      lastError = error;
-      // Continue loop to try the next model in the failover chain
+    } catch (err: any) {
+      console.warn("[Gemini Parser] SDK init error:", err);
     }
   }
 
-  // If we run out of models to try
-  throw new Error(`All Gemini models failed. Last error: ${lastError?.message || lastError}`);
+  // Fallback if all Gemini LLM calls fail or API key is unavailable
+  console.log("[Gemini Parser] Using fallback rule-based parser.");
+  return fallbackRuleBasedParser(resumeText);
 }

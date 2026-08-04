@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
 import { extractTextFromBuffer } from "@/lib/extractor";
 import { parseResumeWithGemini } from "@/lib/gemini";
 import { calculateMatchScore } from "@/lib/matching";
@@ -56,19 +57,21 @@ export async function uploadResumeAction(formData: FormData) {
       return { success: false, error: "No file uploaded." };
     }
 
-    // Save file locally in a root-level "uploads" folder
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const uploadsDir = path.join(process.cwd(), "uploads");
-    await fs.mkdir(uploadsDir, { recursive: true });
-
-    // Generate a unique filename to avoid collisions
-    const fileExtension = path.extname(file.name);
+    const fileExtension = path.extname(file.name) || ".pdf";
     const uniqueFileName = `${session.user.id}_${Date.now()}${fileExtension}`;
-    const filePath = path.join(uploadsDir, uniqueFileName);
 
-    await fs.writeFile(filePath, buffer);
+    // Write file to temporary OS directory (Vercel serverless compatible)
+    try {
+      const uploadsDir = path.join(os.tmpdir(), "uploads");
+      await fs.mkdir(uploadsDir, { recursive: true });
+      const filePath = path.join(uploadsDir, uniqueFileName);
+      await fs.writeFile(filePath, buffer);
+    } catch (diskErr) {
+      console.warn("Serverless disk write skipped:", diskErr);
+    }
 
     // Step 1: Extract Text
     let rawText = "";
