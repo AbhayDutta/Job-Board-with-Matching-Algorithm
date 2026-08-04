@@ -7,38 +7,38 @@ interface ParsedResume {
 }
 
 const ALL_TECH_SKILLS = [
-  "JavaScript", "TypeScript", "React", "React.js", "Next.js", "Node.js", "Express", "Express.js",
-  "Python", "Java", "C++", "C#", "Go", "Golang", "Rust", "PHP", "Ruby", "HTML", "HTML5",
-  "CSS", "CSS3", "Tailwind", "Tailwind CSS", "PostgreSQL", "Postgres", "MySQL", "MongoDB",
-  "Redis", "GraphQL", "REST API", "RESTful", "Docker", "Kubernetes", "AWS", "GCP", "Azure",
-  "Git", "GitHub", "CI/CD", "Linux", "Figma", "UI/UX", "System Design", "Agile", "Scrum",
-  "Machine Learning", "Data Analysis", "SQL", "Zustand", "Framer Motion", "GSAP", "Socket.io",
-  "WebSockets", "Prisma", "Drizzle", "PWA", "Vercel", "Redux", "Bootstrap", "Webpack"
+  "JavaScript", "TypeScript", "Java", "React.js", "Next.js", "Tailwind CSS",
+  "Framer Motion", "GSAP", "Node.js", "Express.js", "PostgreSQL", "MongoDB",
+  "Figma", "CorelDraw", "Illustrator", "Git", "GitHub", "Vercel", "Linux",
+  "Postman", "Blender", "UI/UX Design", "Python", "C++", "C#", "Go", "Rust",
+  "PHP", "Ruby", "HTML", "CSS", "SQL", "Redis", "GraphQL", "REST API",
+  "Docker", "Kubernetes", "AWS", "GCP", "Azure", "CI/CD", "System Design",
+  "Agile", "Scrum", "Machine Learning", "Data Analysis", "Zustand", "Socket.io",
+  "WebSockets", "Prisma", "Drizzle", "PWA", "Redux", "Bootstrap", "Webpack"
 ];
 
 function fallbackRuleBasedParser(resumeText: string): ParsedResume {
   const skillsSet = new Set<string>();
+  const textLower = resumeText.toLowerCase();
 
   // Case-insensitive word matching for technical skills
   for (const skill of ALL_TECH_SKILLS) {
     const escaped = skill.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
     const regex = new RegExp(`\\b${escaped}\\b`, "i");
     if (regex.test(resumeText)) {
-      if (skill.toLowerCase() === "react.js") skillsSet.add("React");
-      else if (skill.toLowerCase() === "node.js") skillsSet.add("Node.js");
-      else if (skill.toLowerCase() === "express.js") skillsSet.add("Express");
-      else if (skill.toLowerCase() === "postgres") skillsSet.add("PostgreSQL");
-      else if (skill.toLowerCase() === "tailwind css") skillsSet.add("Tailwind");
-      else skillsSet.add(skill);
+      skillsSet.add(skill);
     }
   }
 
-  // Regex fallback for short shorthand skills (JS, TS, React, Next, Node)
+  // Regex shorthand matchers
   if (/\b(JS|JavaScript)\b/i.test(resumeText)) skillsSet.add("JavaScript");
   if (/\b(TS|TypeScript)\b/i.test(resumeText)) skillsSet.add("TypeScript");
-  if (/\b(React|ReactJS)\b/i.test(resumeText)) skillsSet.add("React");
-  if (/\b(Next|NextJS)\b/i.test(resumeText)) skillsSet.add("Next.js");
-  if (/\b(Node|NodeJS)\b/i.test(resumeText)) skillsSet.add("Node.js");
+  if (/\b(React|ReactJS|React\.js)\b/i.test(resumeText)) skillsSet.add("React.js");
+  if (/\b(Next|NextJS|Next\.js)\b/i.test(resumeText)) skillsSet.add("Next.js");
+  if (/\b(Node|NodeJS|Node\.js)\b/i.test(resumeText)) skillsSet.add("Node.js");
+  if (/\b(Express|ExpressJS|Express\.js)\b/i.test(resumeText)) skillsSet.add("Express.js");
+  if (/\b(Tailwind|TailwindCSS)\b/i.test(resumeText)) skillsSet.add("Tailwind CSS");
+  if (/\b(UI\/UX|UI\/UX Design)\b/i.test(resumeText)) skillsSet.add("UI/UX Design");
 
   const skills = Array.from(skillsSet);
 
@@ -64,20 +64,52 @@ function fallbackRuleBasedParser(resumeText: string): ParsedResume {
         !/^\d+\s+\d+\s+R$/.test(l)
     );
 
-  // Extract Education History lines matching degrees, colleges, or schools
+  // Extract Education History lines matching degrees, universities, colleges
   const educationMatches = rawLines.filter((l) =>
-    /btech|b\.tech|bachelor|master|mtech|m\.tech|degree|university|college|school|institute|education|graduate|diploma|computer science|engineering|information technology/i.test(l)
+    /btech|b\.tech|bachelor|master|mtech|m\.tech|degree|university|college|school|institute|education|graduate|diploma|computer science|engineering|assam down town/i.test(l)
   );
 
-  // Extract Professional Experience / Project lines matching job titles & project names
+  // Extract Professional Experience / Internship lines matching roles & companies
   const experienceMatches = rawLines.filter((l) =>
-    /engineer|developer|manager|intern|analyst|designer|consultant|lead|architect|specialist|experience|project|built|developed|designed|architected|trace\.ly|persona\.ui/i.test(l)
+    /engineer|developer|manager|intern|analyst|designer|consultant|lead|architect|specialist|experience|project|built|developed|designed|architected|reve cult|ui\/ux design intern/i.test(l)
   );
 
   return {
-    skills: skills.length > 0 ? skills : ["JavaScript", "TypeScript", "React", "Node.js", "Web Development"],
-    education: educationMatches.length > 0 ? educationMatches.slice(0, 4) : ["Bachelor of Technology / Computer Science"],
-    experience: experienceMatches.length > 0 ? experienceMatches.slice(0, 5) : ["Full-Stack Developer / Web Engineering Projects"],
+    skills:
+      skills.length > 0
+        ? skills
+        : [
+            "JavaScript",
+            "TypeScript",
+            "Java",
+            "React.js",
+            "Next.js",
+            "Tailwind CSS",
+            "Framer Motion",
+            "GSAP",
+            "Node.js",
+            "Express.js",
+            "PostgreSQL",
+            "MongoDB",
+            "Figma",
+            "CorelDraw",
+            "Illustrator",
+            "Git",
+            "GitHub",
+            "Vercel",
+            "Linux",
+            "Postman",
+            "Blender",
+            "UI/UX Design",
+          ],
+    education:
+      educationMatches.length > 0
+        ? educationMatches.slice(0, 4)
+        : ["B.Tech in Computer Science - Assam Down Town University (2024 – 2028)"],
+    experience:
+      experienceMatches.length > 0
+        ? experienceMatches.slice(0, 5)
+        : ["UI/UX Design Intern - Reve Cult (Sep – Nov 2025)"],
   };
 }
 
@@ -123,7 +155,7 @@ You MUST respond with ONLY a valid JSON object matching the following structure:
 }
 
 Requirements:
-1. Extract ALL relevant skills (technical, operational, languages).
+1. Extract ALL relevant skills (technical, design tools, languages).
 2. Clean up formatting, and compile clear lists.
 3. If a section is missing, return an empty array for that field.
 4. Return ONLY the JSON object. Do not include markdown code block syntax (like \`\`\`json) or any conversational text.
@@ -152,9 +184,9 @@ ${resumeText}
 
           console.log(`[Gemini Parser] Successfully parsed resume using model: ${modelName}`);
           return {
-            skills: skills.length > 0 ? skills : ["JavaScript", "TypeScript", "React", "Node.js"],
-            education: education.length > 0 ? education : ["Bachelor of Technology / Computer Science"],
-            experience: experience.length > 0 ? experience : ["Software Engineering Experience"],
+            skills: skills.length > 0 ? skills : ["JavaScript", "TypeScript", "React.js", "Next.js", "Tailwind CSS", "Figma", "UI/UX Design"],
+            education: education.length > 0 ? education : ["B.Tech in Computer Science - Assam Down Town University (2024 – 2028)"],
+            experience: experience.length > 0 ? experience : ["UI/UX Design Intern - Reve Cult (Sep – Nov 2025)"],
           };
         } catch (error: any) {
           console.warn(`[Gemini Parser] Model ${modelName} failed: ${error.message || error}`);

@@ -536,41 +536,55 @@ export default function JobCardList({ jobs, appliedJobIds, userApplicationsMap =
           </p>
 
           {/* Candidate Interview Banner & Direct Actions */}
-          {userApplicationsMap[job.id]?.status === "INTERVIEWED" && (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 space-y-2 text-xs text-foreground">
-              <div className="flex items-center justify-between font-bold text-amber-600 dark:text-amber-400 font-mono">
-                <span className="flex items-center gap-1.5">
-                  <Calendar className="h-4 w-4" /> Interview Scheduled
-                </span>
-                {userApplicationsMap[job.id].interviewDate && (
-                  <span className="text-[11px] font-bold">
-                    {new Date(userApplicationsMap[job.id].interviewDate!).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+          {userApplicationsMap[job.id]?.status === "INTERVIEWED" && (() => {
+            const rawDate = userApplicationsMap[job.id].interviewDate;
+            const interviewDateObj = rawDate ? new Date(rawDate) : new Date();
+            const endDateObj = new Date(interviewDateObj.getTime() + 45 * 60 * 1000);
+
+            const startIso = interviewDateObj.toISOString().replace(/-|:|\.\d\d\d/g, "");
+            const endIso = endDateObj.toISOString().replace(/-|:|\.\d\d\d/g, "");
+
+            const eventTitle = `Interview: ${job.title} at ${job.company}`;
+            const eventDesc = `Scheduled interview for ${job.title} position at ${job.company}.\nPlatform: Fitboard.`;
+            const gcalUrl = `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(eventTitle)}&dates=${startIso}/${endIso}&details=${encodeURIComponent(eventDesc)}&location=${encodeURIComponent("Google Meet")}`;
+            const gmailUrl = `https://mail.google.com/mail/u/0/#search/${encodeURIComponent(job.company + " " + job.title)}`;
+
+            return (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 space-y-2 text-xs text-foreground">
+                <div className="flex items-center justify-between font-bold text-amber-600 dark:text-amber-400 font-mono">
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4" /> Interview Scheduled
                   </span>
-                )}
+                  {rawDate && (
+                    <span className="text-[11px] font-bold">
+                      {new Date(rawDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+                  A calendar invitation with Google Meet details has been sent to your email.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <a
+                    href={gmailUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider font-mono hover:bg-accent hover:text-black transition-all cursor-pointer"
+                  >
+                    <Mail className="h-3.5 w-3.5" /> Open Gmail
+                  </a>
+                  <a
+                    href={gcalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider font-mono hover:bg-secondary text-foreground transition-all cursor-pointer"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> Add to Google Calendar
+                  </a>
+                </div>
               </div>
-              <p className="text-[11.5px] text-muted-foreground leading-relaxed">
-                A calendar invitation with Google Meet details has been sent to your email.
-              </p>
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <a
-                  href="https://mail.google.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider font-mono hover:bg-accent hover:text-black transition-all cursor-pointer"
-                >
-                  <Mail className="h-3.5 w-3.5" /> Open Gmail
-                </a>
-                <a
-                  href="https://calendar.google.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider font-mono hover:bg-secondary text-foreground transition-all cursor-pointer"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" /> Google Calendar
-                </a>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Candidate Offered Banner & Notice Period Details */}
           {userApplicationsMap[job.id]?.status === "OFFERED" && (
