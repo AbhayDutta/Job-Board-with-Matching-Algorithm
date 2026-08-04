@@ -60,62 +60,51 @@ export function cleanPdfBinaryArtifacts(text: string): string {
 
 /**
  * Extracts raw text from a PDF or DOCX file buffer.
- * Filters out raw binary PDF structure tags to ensure clean human text.
+ * Gracefully handles standard PDFs, Canva PDFs, and DOCX files.
  */
 export async function extractTextFromBuffer(buffer: Buffer, mimeType: string): Promise<string> {
   const isPdf = mimeType === "application/pdf" || mimeType.includes("pdf");
 
   if (isPdf) {
-    // Attempt 1: Node bundle entry point
+    // Attempt 1: Standard pdf-parse v2 PDFParse class
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const pdfNode = require("pdf-parse/node");
-      if (pdfNode.PDFParse) {
-        const parser = new pdfNode.PDFParse({ data: new Uint8Array(buffer) });
+      const { PDFParse } = require("pdf-parse");
+      if (PDFParse) {
+        const parser = new PDFParse({ data: new Uint8Array(buffer) });
         const result = await parser.getText();
         await parser.destroy();
-        if (result.text && result.text.trim().length > 0) {
+        if (result && result.text && result.text.trim().length > 5) {
           const cleanedText = cleanPdfBinaryArtifacts(result.text);
-          if (cleanedText.length > 20) return cleanedText;
-        }
-      } else if (typeof pdfNode === "function") {
-        const result = await pdfNode(buffer);
-        if (result && result.text && result.text.trim().length > 0) {
-          const cleanedText = cleanPdfBinaryArtifacts(result.text);
-          if (cleanedText.length > 20) return cleanedText;
+          if (cleanedText.length > 5) return cleanedText;
         }
       }
     } catch (e1: any) {
-      console.warn("pdf-parse/node attempt failed:", e1?.message || e1);
+      console.warn("PDFParse attempt 1 failed:", e1?.message || e1);
     }
 
-    // Attempt 2: Standard entry point
+    // Attempt 2: Node bundle entry point (pdf-parse/node)
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const pdf = require("pdf-parse");
-      if (typeof pdf === "function") {
-        const data = await pdf(buffer);
-        if (data && data.text && data.text.trim().length > 0) {
-          const cleanedText = cleanPdfBinaryArtifacts(data.text);
-          if (cleanedText.length > 20) return cleanedText;
-        }
-      } else if (pdf.PDFParse) {
-        const parser = new pdf.PDFParse({ data: new Uint8Array(buffer) });
+      const pdfNode = require("pdf-parse/node");
+      const PDFParse = pdfNode.PDFParse || pdfNode;
+      if (PDFParse && typeof PDFParse === "function" && PDFParse.prototype?.getText) {
+        const parser = new PDFParse({ data: new Uint8Array(buffer) });
         const result = await parser.getText();
         await parser.destroy();
-        if (result.text && result.text.trim().length > 0) {
+        if (result && result.text && result.text.trim().length > 5) {
           const cleanedText = cleanPdfBinaryArtifacts(result.text);
-          if (cleanedText.length > 20) return cleanedText;
+          if (cleanedText.length > 5) return cleanedText;
         }
       }
     } catch (e2: any) {
-      console.warn("pdf-parse standard attempt failed:", e2?.message || e2);
+      console.warn("pdf-parse/node attempt 2 failed:", e2?.message || e2);
     }
 
-    // Attempt 3: Buffer string extraction with deep binary filtering
+    // Attempt 3: Printable string extraction from buffer
     const rawText = buffer.toString("utf-8");
     const cleaned = cleanPdfBinaryArtifacts(rawText);
-    return cleaned || "Candidate Resume Details";
+    return cleaned;
   } else if (
     mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     mimeType === "application/msword" ||
@@ -133,11 +122,10 @@ export async function extractTextFromBuffer(buffer: Buffer, mimeType: string): P
 
     const rawText = buffer.toString("utf-8");
     const cleaned = cleanPdfBinaryArtifacts(rawText);
-    return cleaned || "Candidate Resume Details";
+    return cleaned;
   }
 
-  // General fallback for any file format
   const rawText = buffer.toString("utf-8");
   const cleaned = cleanPdfBinaryArtifacts(rawText);
-  return cleaned || "Candidate Resume Details";
+  return cleaned;
 }
