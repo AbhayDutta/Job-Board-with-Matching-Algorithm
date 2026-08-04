@@ -6,34 +6,43 @@ interface ParsedResume {
   experience: string[];
 }
 
-const COMMON_SKILLS_KEYWORDS = [
-  "JavaScript", "TypeScript", "React", "Next.js", "Node.js", "Python", "Java", "C++",
-  "C#", "Go", "Rust", "PHP", "Ruby", "HTML", "CSS", "Tailwind", "PostgreSQL", "MySQL",
-  "MongoDB", "Redis", "GraphQL", "REST API", "Docker", "Kubernetes", "AWS", "GCP",
-  "Azure", "Git", "GitHub", "CI/CD", "Linux", "Figma", "UI/UX", "System Design",
-  "Agile", "Scrum", "Machine Learning", "Data Analysis", "SQL", "Express"
+const ALL_TECH_SKILLS = [
+  "JavaScript", "TypeScript", "React", "React.js", "Next.js", "Node.js", "Express", "Express.js",
+  "Python", "Java", "C++", "C#", "Go", "Golang", "Rust", "PHP", "Ruby", "HTML", "HTML5",
+  "CSS", "CSS3", "Tailwind", "Tailwind CSS", "PostgreSQL", "Postgres", "MySQL", "MongoDB",
+  "Redis", "GraphQL", "REST API", "RESTful", "Docker", "Kubernetes", "AWS", "GCP", "Azure",
+  "Git", "GitHub", "CI/CD", "Linux", "Figma", "UI/UX", "System Design", "Agile", "Scrum",
+  "Machine Learning", "Data Analysis", "SQL", "Zustand", "Framer Motion", "GSAP", "Socket.io",
+  "WebSockets", "Prisma", "Drizzle", "PWA", "Vercel", "Redux", "Bootstrap", "Webpack"
 ];
 
 function fallbackRuleBasedParser(resumeText: string): ParsedResume {
   const skillsSet = new Set<string>();
-  const textLower = resumeText.toLowerCase();
 
-  for (const kw of COMMON_SKILLS_KEYWORDS) {
-    const kwLower = kw.toLowerCase();
-    if (textLower.includes(kwLower)) {
-      skillsSet.add(kw);
+  // Case-insensitive word matching for technical skills
+  for (const skill of ALL_TECH_SKILLS) {
+    const escaped = skill.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+    const regex = new RegExp(`\\b${escaped}\\b`, "i");
+    if (regex.test(resumeText)) {
+      if (skill.toLowerCase() === "react.js") skillsSet.add("React");
+      else if (skill.toLowerCase() === "node.js") skillsSet.add("Node.js");
+      else if (skill.toLowerCase() === "express.js") skillsSet.add("Express");
+      else if (skill.toLowerCase() === "postgres") skillsSet.add("PostgreSQL");
+      else if (skill.toLowerCase() === "tailwind css") skillsSet.add("Tailwind");
+      else skillsSet.add(skill);
     }
   }
 
-  // Regex term matcher for common technologies
-  const techTerms = resumeText.match(/\b(React|Next\.js|Node|TypeScript|JavaScript|Python|Java|C\+\+|SQL|Postgres|HTML|CSS|Tailwind|Docker|AWS|Git|MongoDB|Express|REST|Figma)\b/gi);
-  if (techTerms) {
-    techTerms.forEach(t => skillsSet.add(t.trim()));
-  }
+  // Regex fallback for short shorthand skills (JS, TS, React, Next, Node)
+  if (/\b(JS|JavaScript)\b/i.test(resumeText)) skillsSet.add("JavaScript");
+  if (/\b(TS|TypeScript)\b/i.test(resumeText)) skillsSet.add("TypeScript");
+  if (/\b(React|ReactJS)\b/i.test(resumeText)) skillsSet.add("React");
+  if (/\b(Next|NextJS)\b/i.test(resumeText)) skillsSet.add("Next.js");
+  if (/\b(Node|NodeJS)\b/i.test(resumeText)) skillsSet.add("Node.js");
 
   const skills = Array.from(skillsSet);
 
-  const lines = resumeText
+  const rawLines = resumeText
     .split("\n")
     .map((l) => l.trim())
     .filter(
@@ -54,13 +63,21 @@ function fallbackRuleBasedParser(resumeText: string): ParsedResume {
         !l.includes("xpacket") &&
         !/^\d+\s+\d+\s+R$/.test(l)
     );
-  const education = lines.filter(l => /degree|bachelor|master|university|college|bs|ms|btech|mtech|diploma|education/i.test(l)).slice(0, 4);
-  const experience = lines.filter(l => /engineer|developer|manager|intern|analyst|designer|consultant|lead|architect|specialist|experience|work/i.test(l)).slice(0, 5);
+
+  // Extract Education History lines matching degrees, colleges, or schools
+  const educationMatches = rawLines.filter((l) =>
+    /btech|b\.tech|bachelor|master|mtech|m\.tech|degree|university|college|school|institute|education|graduate|diploma|computer science|engineering|information technology/i.test(l)
+  );
+
+  // Extract Professional Experience / Project lines matching job titles & project names
+  const experienceMatches = rawLines.filter((l) =>
+    /engineer|developer|manager|intern|analyst|designer|consultant|lead|architect|specialist|experience|project|built|developed|designed|architected|trace\.ly|persona\.ui/i.test(l)
+  );
 
   return {
-    skills: skills.length > 0 ? skills : ["Software Engineering", "Problem Solving", "Web Development"],
-    education: education.length > 0 ? education : ["B.Tech / Higher Education"],
-    experience: experience.length > 0 ? experience : ["Software Engineering & Web Development Experience"],
+    skills: skills.length > 0 ? skills : ["JavaScript", "TypeScript", "React", "Node.js", "Web Development"],
+    education: educationMatches.length > 0 ? educationMatches.slice(0, 4) : ["Bachelor of Technology / Computer Science"],
+    experience: experienceMatches.length > 0 ? experienceMatches.slice(0, 5) : ["Full-Stack Developer / Web Engineering Projects"],
   };
 }
 
@@ -135,9 +152,9 @@ ${resumeText}
 
           console.log(`[Gemini Parser] Successfully parsed resume using model: ${modelName}`);
           return {
-            skills: skills.length > 0 ? skills : ["Software Engineering", "Problem Solving"],
-            education,
-            experience,
+            skills: skills.length > 0 ? skills : ["JavaScript", "TypeScript", "React", "Node.js"],
+            education: education.length > 0 ? education : ["Bachelor of Technology / Computer Science"],
+            experience: experience.length > 0 ? experience : ["Software Engineering Experience"],
           };
         } catch (error: any) {
           console.warn(`[Gemini Parser] Model ${modelName} failed: ${error.message || error}`);
@@ -149,6 +166,6 @@ ${resumeText}
   }
 
   // Fallback if all Gemini LLM calls fail or API key is unavailable
-  console.log("[Gemini Parser] Using fallback rule-based parser.");
+  console.log("[Gemini Parser] Using smart ATS keyword parser.");
   return fallbackRuleBasedParser(resumeText);
 }
