@@ -430,7 +430,6 @@ export default function ProfilePanel({ initialProfile }: ProfilePanelProps) {
             setEditSkills(updatedProfile?.skills.join(", ") || "");
             setEditEducation(updatedProfile?.education.join("\n") || "");
             setEditExperience(updatedProfile?.experience.join("\n") || "");
-            router.refresh();
           }}
         />
       </div>

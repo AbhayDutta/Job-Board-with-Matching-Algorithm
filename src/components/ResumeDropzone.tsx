@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useDropzone, FileRejection } from "react-dropzone";
+import { useRouter } from "next/navigation";
 import { uploadResumeAction } from "@/app/actions/candidate";
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ interface ResumeDropzoneProps {
 }
 
 export default function ResumeDropzone({ onSuccess, currentResumeUrl }: ResumeDropzoneProps) {
+  const router = useRouter();
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -43,10 +45,14 @@ export default function ResumeDropzone({ onSuccess, currentResumeUrl }: ResumeDr
       setUploadProgress(100);
 
       if (res.success) {
-        toast.success("Resume uploaded and parsed successfully with Gemini AI!");
+        const msg = res.fallback
+          ? "Resume uploaded! Some fields could not be auto-parsed — please verify below."
+          : "Resume uploaded and parsed successfully!";
+        toast.success(msg);
         if (onSuccess && res.profile) {
           onSuccess(res.profile);
         }
+        router.refresh();
       } else {
         toast.error(res.error || "Failed to parse resume.");
       }

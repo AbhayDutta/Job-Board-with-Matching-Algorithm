@@ -26,7 +26,7 @@ const ALL_TECH_SKILLS = [
   "CI/CD", "GitHub Actions", "Jenkins", "Terraform", "Linux",
   // Tools
   "Git", "GitHub", "Postman", "Jira", "Figma", "Blender", "CorelDraw",
-  "Illustrator", "Photoshop", "After Effects",
+  "Illustrator", "Photoshop", "After Effects", "IBM watsonx",
   // Concepts
   "REST API", "GraphQL", "WebSockets", "Socket.io", "gRPC",
   "Microservices", "System Design", "Agile", "Scrum",
@@ -36,9 +36,105 @@ const ALL_TECH_SKILLS = [
   "UI/UX Design", "Responsive Design", "Wireframing", "Prototyping",
 ];
 
+// ─── Degree prefixes / University keywords ──────────────────────────────────
+const DEGREE_PATTERNS = [
+  /b\.?\s*tech/i, /b\.?\s*e\b/i, /b\.?\s*sc/i, /b\.?\s*com/i, /bba/i,
+  /m\.?\s*tech/i, /m\.?\s*e\b/i, /m\.?\s*sc/i, /mba/i, /phd/i, /ph\.d/i,
+  /bachelor/i, /master/i, /diploma/i, /associate/i,
+];
+const UNI_KEYWORDS = /university|college|institute|school|iit|nit|bits|iiit|vit|lpu|du|mu|pu/i;
+const YEAR_RANGE = /\b(19|20)\d{2}\s*[-–—]\s*((19|20)\d{2}|present|ongoing|current)\b/i;
+
+// ─── Job title keywords ──────────────────────────────────────────────────────
+const JOB_TITLE_PATTERNS = /\b(intern|engineer|developer|designer|manager|analyst|consultant|lead|architect|specialist|officer|director|vp|cto|ceo|founder|co-founder)\b/i;
+
+/**
+ * Attempts to extract a clean education line from a group of raw lines.
+ * Returns formatted: "Degree in Major - Institution (Years)" or best available.
+ */
+function parseEducationLines(rawLines: string[]): string[] {
+  const results: string[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i].trim();
+    if (!line || line.length < 5 || line.length > 200) continue;
+
+    const hasDegree = DEGREE_PATTERNS.some((p) => p.test(line));
+    const hasUni = UNI_KEYWORDS.test(line);
+
+    if (hasDegree || hasUni) {
+      // Try to assemble a clean single line by peeking at neighbors
+      let combined = line;
+      if (i + 1 < rawLines.length && rawLines[i + 1].trim().length > 3) {
+        const next = rawLines[i + 1].trim();
+        // Merge if next line looks like a continuation (year range, university name)
+        if (
+          YEAR_RANGE.test(next) ||
+          (UNI_KEYWORDS.test(next) && !hasDegree) ||
+          (hasDegree && !hasUni && UNI_KEYWORDS.test(next))
+        ) {
+          combined = `${line} - ${next}`;
+          i++; // skip next line
+        }
+      }
+
+      // Clean up excess whitespace
+      const clean = combined.replace(/\s{2,}/g, " ").replace(/\s*[|]\s*/g, " | ").trim();
+      const key = clean.toLowerCase().slice(0, 40);
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push(clean);
+      }
+    }
+  }
+
+  return results.slice(0, 4);
+}
+
+/**
+ * Attempts to extract clean experience lines.
+ * Returns formatted: "Job Title - Company (Dates)"
+ */
+function parseExperienceLines(rawLines: string[]): string[] {
+  const results: string[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i].trim();
+    if (!line || line.length < 5 || line.length > 160) continue;
+
+    const hasTitle = JOB_TITLE_PATTERNS.test(line);
+    const hasYear = YEAR_RANGE.test(line);
+
+    if (hasTitle) {
+      let combined = line;
+      // Check next line for date range
+      if (!hasYear && i + 1 < rawLines.length) {
+        const next = rawLines[i + 1].trim();
+        if (YEAR_RANGE.test(next)) {
+          combined = `${line} (${next})`;
+          i++;
+        }
+      }
+
+      const clean = combined.replace(/\s{2,}/g, " ").replace(/\s*[|]\s*/g, " | ").trim();
+      // Only keep concise lines that look like job titles, not bullet points
+      if (clean.length <= 120 && !clean.startsWith("•") && !clean.startsWith("-")) {
+        const key = clean.toLowerCase().slice(0, 40);
+        if (!seen.has(key)) {
+          seen.add(key);
+          results.push(clean);
+        }
+      }
+    }
+  }
+
+  return results.slice(0, 5);
+}
+
 /**
  * Keyword-based rule parser — used when Gemini API is unavailable.
- * Returns only what it actually finds in the resume text.
  */
 function fallbackRuleBasedParser(resumeText: string): ParsedResume {
   const skillsSet = new Set<string>();
@@ -59,30 +155,24 @@ function fallbackRuleBasedParser(resumeText: string): ParsedResume {
   if (/\b(Express|ExpressJS|Express\.js)\b/i.test(text)) skillsSet.add("Express.js");
   if (/\b(Tailwind|TailwindCSS)\b/i.test(text)) skillsSet.add("Tailwind CSS");
   if (/\b(UI\/UX|UX\/UI)\b/i.test(text)) skillsSet.add("UI/UX Design");
+  if (/\bGSAP\b/i.test(text)) skillsSet.add("GSAP");
+  if (/\bBlender\b/i.test(text)) skillsSet.add("Blender");
+  if (/\bPostman\b/i.test(text)) skillsSet.add("Postman");
+  if (/\b(CorelDraw|Corel Draw)\b/i.test(text)) skillsSet.add("CorelDraw");
+  if (/\bIllustrator\b/i.test(text)) skillsSet.add("Illustrator");
+  if (/\b(Framer Motion|Framer)\b/i.test(text)) skillsSet.add("Framer Motion");
 
   const skills = Array.from(skillsSet);
 
   const rawLines = text
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.length > 5);
+    .filter((l) => l.length > 4 && !/^[%<>{}\[\]\\]/.test(l));
 
-  // Education: lines mentioning degrees, schools, GPA, etc.
-  const educationMatches = rawLines.filter((l) =>
-    /b\.?tech|b\.?e\b|bsc|msc|m\.?tech|m\.?e\b|bachelor|master|phd|mba|diploma|degree|university|college|school|institute|education|engineering|science|gpa|sgpa|cgpa/i.test(l)
-  );
+  const education = parseEducationLines(rawLines);
+  const experience = parseExperienceLines(rawLines);
 
-  // Experience: lines mentioning job roles and companies
-  const experienceMatches = rawLines.filter((l) =>
-    /\b(intern|engineer|developer|designer|manager|analyst|consultant|lead|architect|specialist|officer|director|vp|cto|ceo)\b/i.test(l) &&
-    l.length < 120 // avoid grabbing bullet points of achievements
-  );
-
-  return {
-    skills,
-    education: educationMatches.slice(0, 4),
-    experience: experienceMatches.slice(0, 5),
-  };
+  return { skills, education, experience };
 }
 
 /**
@@ -121,14 +211,14 @@ Extract structured information from the resume text below.
 Respond ONLY with a valid JSON object:
 {
   "skills": ["Skill1", "Skill2", ...],
-  "education": ["Degree - Institution (Year range or expected graduation)"],
-  "experience": ["Job Title - Company Name (Date range or duration)"]
+  "education": ["Degree in Major - Institution Name (Start Year – End Year or Expected)"],
+  "experience": ["Job Title - Company Name (Month Year – Month Year)"]
 }
 
 Rules:
-- Extract ALL technical skills, tools, programming languages, and design skills mentioned.
-- For education: include degree, major, institution, and years (e.g. "B.Tech in Computer Science - MIT (2020 – 2024)").
-- For experience: include job title, company, and dates (e.g. "Software Engineer - Google (Jun 2022 – Present)").
+- Extract ALL technical skills, tools, programming languages, frameworks, and design skills mentioned.
+- For education: format as "Degree in Major - Institution (Start – End)" e.g. "B.Tech in Computer Science - Assam Down Town University (2024 – 2028)".
+- For experience: format as "Title - Company (Dates)" e.g. "UI/UX Design Intern - Reve Cult (Sep – Nov 2025)".
 - If a section has no clear data, return an empty array [].
 - Return ONLY the JSON. No markdown, no explanation.
 
