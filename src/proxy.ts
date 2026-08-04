@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
 
+const AUTH_SECRET = process.env.NEXTAUTH_SECRET || "fitboard-auth-secret-keys-neon-postgress-3453";
+
 export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
   // Protect dashboard routes
   if (path.startsWith("/dashboard")) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getToken({ req, secret: AUTH_SECRET });
 
     if (!token) {
       return NextResponse.redirect(new URL("/login", req.url));
