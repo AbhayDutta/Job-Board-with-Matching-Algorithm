@@ -48,20 +48,34 @@ export async function uploadResumeAction(formData: FormData) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user?.role !== "CANDIDATE") {
+    if (!session || !session.user || session.user?.role !== "CANDIDATE") {
       return { success: false, error: "Unauthorized. Candidates only." };
     }
 
+    // Verify candidate user exists in database
+    let dbUser = await db.user.findUnique({ where: { id: session.user.id } });
+    if (!dbUser && session.user.email) {
+      dbUser = await db.user.findFirst({
+        where: { email: { equals: session.user.email.toLowerCase().trim(), mode: "insensitive" } },
+      });
+    }
+
+    if (!dbUser) {
+      return { success: false, error: "User session expired. Please log out and log in again." };
+    }
+
+    const userId = dbUser.id;
+
     const file = formData.get("resume") as File | null;
     if (!file || file.size === 0) {
-      return { success: false, error: "No file uploaded." };
+      return { success: false, error: "No file selected for upload." };
     }
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
     const fileExtension = path.extname(file.name) || ".pdf";
-    const uniqueFileName = `${session.user.id}_${Date.now()}${fileExtension}`;
+    const uniqueFileName = `${userId}_${Date.now()}${fileExtension}`;
 
     // Write file to temporary OS directory (Vercel serverless compatible)
     try {
@@ -80,11 +94,11 @@ export async function uploadResumeAction(formData: FormData) {
     } catch (err: any) {
       return {
         success: false,
-        error: `Text extraction failed: ${err.message}. Please verify the file is not corrupted.`,
+        error: `Text extraction failed: ${err?.message || err}. Please verify the file format.`,
       };
     }
 
-    // Step 2: Call LLM Parser
+    // Step 2: Call LLM / ATS Parser
     let parsedData = { skills: [] as string[], education: [] as string[], experience: [] as string[] };
     let parserFailed = false;
     let parserErrorMessage = "";
@@ -94,22 +108,20 @@ export async function uploadResumeAction(formData: FormData) {
     } catch (err: any) {
       console.error("LLM parser failed, falling back to manual entry option:", err);
       parserFailed = true;
-      parserErrorMessage = err.message;
+      parserErrorMessage = err?.message || String(err);
     }
 
-    // Step 3: Save to Candidate Profile
-    // If LLM fails, we still update the resumeUrl so they know a resume is uploaded,
-    // but we preserve existing profile data or let them edit.
+    // Step 3: Save to Candidate Profile in database
     let updatedProfile;
     if (parserFailed) {
       updatedProfile = await db.candidateProfile.upsert({
-        where: { userId: session.user.id },
+        where: { userId },
         update: {
           resumeUrl: uniqueFileName,
         },
         create: {
-          userId: session.user.id,
-          name: session.user.email.split("@")[0], // Fallback name
+          userId,
+          name: dbUser.name || session.user.email?.split("@")[0] || "Candidate",
           skills: [],
           experience: [],
           education: [],
@@ -133,9 +145,9 @@ export async function uploadResumeAction(formData: FormData) {
       };
     }
 
-    // Success path: LLM parsed details successfully
+    // Success path: Parsed details successfully
     updatedProfile = await db.candidateProfile.upsert({
-      where: { userId: session.user.id },
+      where: { userId },
       update: {
         skills: parsedData.skills,
         experience: parsedData.experience,
@@ -143,8 +155,8 @@ export async function uploadResumeAction(formData: FormData) {
         resumeUrl: uniqueFileName,
       },
       create: {
-        userId: session.user.id,
-        name: session.user.email.split("@")[0],
+        userId,
+        name: dbUser.name || session.user.email?.split("@")[0] || "Candidate",
         skills: parsedData.skills,
         experience: parsedData.experience,
         education: parsedData.education,
@@ -153,7 +165,7 @@ export async function uploadResumeAction(formData: FormData) {
     });
 
     // Update match scores for all job applications this candidate has submitted
-    await updateAppliedJobsScores(session.user.id, parsedData.skills);
+    await updateAppliedJobsScores(userId, parsedData.skills);
 
     revalidatePath("/dashboard/candidate/jobs");
     revalidatePath("/dashboard/employer/jobs");
@@ -169,7 +181,10 @@ export async function uploadResumeAction(formData: FormData) {
     };
   } catch (error: any) {
     console.error("Upload resume action error:", error);
-    return { success: false, error: "An unexpected error occurred during resume upload." };
+    return {
+      success: false,
+      error: `Upload Error: ${error?.message || "An unexpected error occurred during resume upload."}`,
+    };
   }
 }
 
@@ -180,13 +195,33 @@ export async function updateCandidateProfile(skills: string[], education: string
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user?.role !== "CANDIDATE") {
+    if (!session || !session.user || session.user?.role !== "CANDIDATE") {
       return { success: false, error: "Unauthorized. Candidates only." };
     }
 
-    const updatedProfile = await db.candidateProfile.update({
-      where: { userId: session.user.id },
-      data: {
+    let dbUser = await db.user.findUnique({ where: { id: session.user.id } });
+    if (!dbUser && session.user.email) {
+      dbUser = await db.user.findFirst({
+        where: { email: { equals: session.user.email.toLowerCase().trim(), mode: "insensitive" } },
+      });
+    }
+
+    if (!dbUser) {
+      return { success: false, error: "User session expired. Please log out and sign in again." };
+    }
+
+    const userId = dbUser.id;
+
+    const updatedProfile = await db.candidateProfile.upsert({
+      where: { userId },
+      update: {
+        skills,
+        education,
+        experience,
+      },
+      create: {
+        userId,
+        name: dbUser.name || session.user.email?.split("@")[0] || "Candidate",
         skills,
         education,
         experience,
@@ -194,7 +229,7 @@ export async function updateCandidateProfile(skills: string[], education: string
     });
 
     // Re-evaluate application scores
-    await updateAppliedJobsScores(session.user.id, skills);
+    await updateAppliedJobsScores(userId, skills);
 
     revalidatePath("/dashboard/candidate/jobs");
     revalidatePath("/dashboard/employer/jobs");
@@ -210,6 +245,6 @@ export async function updateCandidateProfile(skills: string[], education: string
     };
   } catch (error: any) {
     console.error("Update candidate profile error:", error);
-    return { success: false, error: "Failed to update profile." };
+    return { success: false, error: `Update Error: ${error?.message || "Failed to update profile."}` };
   }
 }
