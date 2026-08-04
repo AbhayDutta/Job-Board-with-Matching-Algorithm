@@ -6,198 +6,173 @@ interface ParsedResume {
   experience: string[];
 }
 
+// ─── Master skill keyword list ───────────────────────────────────────────────
 const ALL_TECH_SKILLS = [
-  "JavaScript", "TypeScript", "Java", "React.js", "Next.js", "Tailwind CSS",
-  "Framer Motion", "GSAP", "Node.js", "Express.js", "PostgreSQL", "MongoDB",
-  "Figma", "CorelDraw", "Illustrator", "Git", "GitHub", "Vercel", "Linux",
-  "Postman", "Blender", "UI/UX Design", "Python", "C++", "C#", "Go", "Rust",
-  "PHP", "Ruby", "HTML", "CSS", "SQL", "Redis", "GraphQL", "REST API",
-  "Docker", "Kubernetes", "AWS", "GCP", "Azure", "CI/CD", "System Design",
-  "Agile", "Scrum", "Machine Learning", "Data Analysis", "Zustand", "Socket.io",
-  "WebSockets", "Prisma", "Drizzle", "PWA", "Redux", "Bootstrap", "Webpack"
+  // Languages
+  "JavaScript", "TypeScript", "Java", "Python", "C++", "C#", "Go", "Rust",
+  "PHP", "Ruby", "Swift", "Kotlin", "Dart", "Scala", "R", "MATLAB",
+  // Frontend
+  "HTML", "CSS", "React.js", "Next.js", "Vue.js", "Angular", "Svelte",
+  "Tailwind CSS", "Bootstrap", "Sass", "SCSS", "Framer Motion", "GSAP",
+  "Three.js", "Redux", "Zustand", "Webpack", "Vite", "PWA",
+  // Backend
+  "Node.js", "Express.js", "NestJS", "Django", "Flask", "FastAPI",
+  "Spring Boot", "Laravel", "Rails", "ASP.NET",
+  // Databases
+  "PostgreSQL", "MongoDB", "MySQL", "SQLite", "Redis", "Firebase",
+  "Supabase", "Cassandra", "DynamoDB",
+  // DevOps / Cloud
+  "Docker", "Kubernetes", "AWS", "GCP", "Azure", "Vercel", "Netlify",
+  "CI/CD", "GitHub Actions", "Jenkins", "Terraform", "Linux",
+  // Tools
+  "Git", "GitHub", "Postman", "Jira", "Figma", "Blender", "CorelDraw",
+  "Illustrator", "Photoshop", "After Effects",
+  // Concepts
+  "REST API", "GraphQL", "WebSockets", "Socket.io", "gRPC",
+  "Microservices", "System Design", "Agile", "Scrum",
+  "Machine Learning", "Deep Learning", "Data Analysis", "Data Science",
+  "Prisma", "Drizzle", "Mongoose", "Sequelize",
+  // Design
+  "UI/UX Design", "Responsive Design", "Wireframing", "Prototyping",
 ];
 
+/**
+ * Keyword-based rule parser — used when Gemini API is unavailable.
+ * Returns only what it actually finds in the resume text.
+ */
 function fallbackRuleBasedParser(resumeText: string): ParsedResume {
   const skillsSet = new Set<string>();
-  const textLower = resumeText.toLowerCase();
+  const text = resumeText;
 
-  // Case-insensitive word matching for technical skills
   for (const skill of ALL_TECH_SKILLS) {
     const escaped = skill.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
     const regex = new RegExp(`\\b${escaped}\\b`, "i");
-    if (regex.test(resumeText)) {
-      skillsSet.add(skill);
-    }
+    if (regex.test(text)) skillsSet.add(skill);
   }
 
-  // Regex shorthand matchers
-  if (/\b(JS|JavaScript)\b/i.test(resumeText)) skillsSet.add("JavaScript");
-  if (/\b(TS|TypeScript)\b/i.test(resumeText)) skillsSet.add("TypeScript");
-  if (/\b(React|ReactJS|React\.js)\b/i.test(resumeText)) skillsSet.add("React.js");
-  if (/\b(Next|NextJS|Next\.js)\b/i.test(resumeText)) skillsSet.add("Next.js");
-  if (/\b(Node|NodeJS|Node\.js)\b/i.test(resumeText)) skillsSet.add("Node.js");
-  if (/\b(Express|ExpressJS|Express\.js)\b/i.test(resumeText)) skillsSet.add("Express.js");
-  if (/\b(Tailwind|TailwindCSS)\b/i.test(resumeText)) skillsSet.add("Tailwind CSS");
-  if (/\b(UI\/UX|UI\/UX Design)\b/i.test(resumeText)) skillsSet.add("UI/UX Design");
+  // Short-form aliases
+  if (/\b(JS|JavaScript)\b/i.test(text)) skillsSet.add("JavaScript");
+  if (/\b(TS|TypeScript)\b/i.test(text)) skillsSet.add("TypeScript");
+  if (/\b(React|ReactJS|React\.js)\b/i.test(text)) skillsSet.add("React.js");
+  if (/\b(Next|NextJS|Next\.js)\b/i.test(text)) skillsSet.add("Next.js");
+  if (/\b(Node|NodeJS|Node\.js)\b/i.test(text)) skillsSet.add("Node.js");
+  if (/\b(Express|ExpressJS|Express\.js)\b/i.test(text)) skillsSet.add("Express.js");
+  if (/\b(Tailwind|TailwindCSS)\b/i.test(text)) skillsSet.add("Tailwind CSS");
+  if (/\b(UI\/UX|UX\/UI)\b/i.test(text)) skillsSet.add("UI/UX Design");
 
   const skills = Array.from(skillsSet);
 
-  const rawLines = resumeText
+  const rawLines = text
     .split("\n")
     .map((l) => l.trim())
-    .filter(
-      (l) =>
-        l.length > 3 &&
-        !l.includes("%PDF") &&
-        !l.includes("obj") &&
-        !l.includes("endobj") &&
-        !l.includes("/Font") &&
-        !l.includes("ReportLab") &&
-        !l.includes("Canva") &&
-        !l.includes("<<") &&
-        !l.includes(">>") &&
-        !l.includes("/BaseFont") &&
-        !l.includes("xmlns:") &&
-        !l.includes("rdf:") &&
-        !l.includes("stream") &&
-        !l.includes("xpacket") &&
-        !/^\d+\s+\d+\s+R$/.test(l)
-    );
+    .filter((l) => l.length > 5);
 
-  // Extract Education History lines matching degrees, universities, colleges
+  // Education: lines mentioning degrees, schools, GPA, etc.
   const educationMatches = rawLines.filter((l) =>
-    /btech|b\.tech|bachelor|master|mtech|m\.tech|degree|university|college|school|institute|education|graduate|diploma|computer science|engineering|assam down town/i.test(l)
+    /b\.?tech|b\.?e\b|bsc|msc|m\.?tech|m\.?e\b|bachelor|master|phd|mba|diploma|degree|university|college|school|institute|education|engineering|science|gpa|sgpa|cgpa/i.test(l)
   );
 
-  // Extract Professional Experience / Internship lines matching roles & companies
+  // Experience: lines mentioning job roles and companies
   const experienceMatches = rawLines.filter((l) =>
-    /engineer|developer|manager|intern|analyst|designer|consultant|lead|architect|specialist|experience|project|built|developed|designed|architected|reve cult|ui\/ux design intern/i.test(l)
+    /\b(intern|engineer|developer|designer|manager|analyst|consultant|lead|architect|specialist|officer|director|vp|cto|ceo)\b/i.test(l) &&
+    l.length < 120 // avoid grabbing bullet points of achievements
   );
 
   return {
-    skills:
-      skills.length > 0
-        ? skills
-        : [
-            "JavaScript",
-            "TypeScript",
-            "Java",
-            "React.js",
-            "Next.js",
-            "Tailwind CSS",
-            "Framer Motion",
-            "GSAP",
-            "Node.js",
-            "Express.js",
-            "PostgreSQL",
-            "MongoDB",
-            "Figma",
-            "CorelDraw",
-            "Illustrator",
-            "Git",
-            "GitHub",
-            "Vercel",
-            "Linux",
-            "Postman",
-            "Blender",
-            "UI/UX Design",
-          ],
-    education:
-      educationMatches.length > 0
-        ? educationMatches.slice(0, 4)
-        : ["B.Tech in Computer Science - Assam Down Town University (2024 – 2028)"],
-    experience:
-      experienceMatches.length > 0
-        ? experienceMatches.slice(0, 5)
-        : ["UI/UX Design Intern - Reve Cult (Sep – Nov 2025)"],
+    skills,
+    education: educationMatches.slice(0, 4),
+    experience: experienceMatches.slice(0, 5),
   };
 }
 
 /**
- * Parses raw resume text into a structured JSON schema using official Gemini models.
- * Implements valid model names (gemini-1.5-flash, gemini-2.0-flash) with a smart fallback.
+ * Parses raw resume text into structured JSON using Gemini AI.
+ * Falls back to keyword-based parser if the API is unavailable.
  */
-export async function parseResumeWithGemini(resumeText: string): Promise<ParsedResume> {
+export async function parseResumeWithGemini(
+  resumeText: string
+): Promise<ParsedResume> {
   const apiKey = process.env.GEMINI_API_KEY;
 
-  // Official Gemini model identifiers
   const modelsToTry = [
+    "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
     "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
     "gemini-1.5-pro",
   ];
 
-  if (apiKey) {
+  if (apiKey && resumeText && resumeText.trim().length > 50) {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
 
       for (const modelName of modelsToTry) {
         try {
-          console.log(`[Gemini Parser] Attempting text extraction with model: ${modelName}`);
+          console.log(`[Gemini] Trying model: ${modelName}`);
 
           const model = genAI.getGenerativeModel({
             model: modelName,
-            generationConfig: {
-              responseMimeType: "application/json",
-            },
+            generationConfig: { responseMimeType: "application/json" },
           });
 
           const prompt = `
-You are an expert ATS (Applicant Tracking System) parser.
-Extract the candidate's skills, education history, and professional experience from the raw resume text provided below.
+You are an expert ATS (Applicant Tracking System) resume parser.
+Extract structured information from the resume text below.
 
-You MUST respond with ONLY a valid JSON object matching the following structure:
+Respond ONLY with a valid JSON object:
 {
-  "skills": ["Skill1", "Skill2", "Skill3", ...],
-  "education": ["Degree/Major - School Name (Dates or Status)", ...],
-  "experience": ["Job Title - Company Name (Dates or Duration)", ...]
+  "skills": ["Skill1", "Skill2", ...],
+  "education": ["Degree - Institution (Year range or expected graduation)"],
+  "experience": ["Job Title - Company Name (Date range or duration)"]
 }
 
-Requirements:
-1. Extract ALL relevant skills (technical, design tools, languages).
-2. Clean up formatting, and compile clear lists.
-3. If a section is missing, return an empty array for that field.
-4. Return ONLY the JSON object. Do not include markdown code block syntax (like \`\`\`json) or any conversational text.
+Rules:
+- Extract ALL technical skills, tools, programming languages, and design skills mentioned.
+- For education: include degree, major, institution, and years (e.g. "B.Tech in Computer Science - MIT (2020 – 2024)").
+- For experience: include job title, company, and dates (e.g. "Software Engineer - Google (Jun 2022 – Present)").
+- If a section has no clear data, return an empty array [].
+- Return ONLY the JSON. No markdown, no explanation.
 
 Resume text:
-${resumeText}
+${resumeText.slice(0, 8000)}
           `;
 
           const result = await model.generateContent(prompt);
-          const text = result.response.text();
+          const raw = result.response.text();
+          if (!raw) continue;
 
-          if (!text) {
-            continue;
+          let cleaned = raw.trim();
+          if (cleaned.startsWith("```")) {
+            cleaned = cleaned
+              .replace(/^```json\s*/i, "")
+              .replace(/```$/, "")
+              .trim();
           }
 
-          let cleanText = text.trim();
-          if (cleanText.startsWith("```")) {
-            cleanText = cleanText.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-          }
+          const data = JSON.parse(cleaned);
+          const skills = Array.isArray(data.skills)
+            ? data.skills.map((s: any) => String(s).trim()).filter(Boolean)
+            : [];
+          const education = Array.isArray(data.education)
+            ? data.education.map((e: any) => String(e).trim()).filter(Boolean)
+            : [];
+          const experience = Array.isArray(data.experience)
+            ? data.experience.map((ex: any) => String(ex).trim()).filter(Boolean)
+            : [];
 
-          const data = JSON.parse(cleanText);
-
-          const skills = Array.isArray(data.skills) ? data.skills.map((s: any) => String(s).trim()) : [];
-          const education = Array.isArray(data.education) ? data.education.map((e: any) => String(e).trim()) : [];
-          const experience = Array.isArray(data.experience) ? data.experience.map((ex: any) => String(ex).trim()) : [];
-
-          console.log(`[Gemini Parser] Successfully parsed resume using model: ${modelName}`);
-          return {
-            skills: skills.length > 0 ? skills : ["JavaScript", "TypeScript", "React.js", "Next.js", "Tailwind CSS", "Figma", "UI/UX Design"],
-            education: education.length > 0 ? education : ["B.Tech in Computer Science - Assam Down Town University (2024 – 2028)"],
-            experience: experience.length > 0 ? experience : ["UI/UX Design Intern - Reve Cult (Sep – Nov 2025)"],
-          };
-        } catch (error: any) {
-          console.warn(`[Gemini Parser] Model ${modelName} failed: ${error.message || error}`);
+          console.log(
+            `[Gemini] Parsed: ${skills.length} skills, ${education.length} edu, ${experience.length} exp`
+          );
+          return { skills, education, experience };
+        } catch (err: any) {
+          console.warn(`[Gemini] Model ${modelName} failed: ${err?.message}`);
         }
       }
     } catch (err: any) {
-      console.warn("[Gemini Parser] SDK init error:", err);
+      console.warn("[Gemini] SDK init failed:", err?.message);
     }
   }
 
-  // Fallback if all Gemini LLM calls fail or API key is unavailable
-  console.log("[Gemini Parser] Using smart ATS keyword parser.");
+  // Fallback: keyword-based parser
+  console.log("[Gemini] Using keyword-based fallback parser.");
   return fallbackRuleBasedParser(resumeText);
 }

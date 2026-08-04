@@ -1,131 +1,113 @@
 import mammoth from "mammoth";
 
-// Polyfill DOMMatrix for Node.js environments
-if (typeof global !== "undefined" && !(global as any).DOMMatrix) {
-  (global as any).DOMMatrix = class DOMMatrix {};
-}
-
 /**
- * Strips out raw PDF binary tags, stream objects, XML structures, and PDF headers.
+ * Extracts clean human-readable text from a PDF buffer using pdf2json.
+ * pdf2json is a pure Node.js parser — no web workers, no browser APIs.
+ * Works natively in Vercel serverless functions.
  */
-export function cleanPdfBinaryArtifacts(text: string): string {
-  if (!text) return "";
+async function extractPdfWithPdf2json(buffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const PDFParser = require("pdf2json");
+    const pdfParser = new PDFParser(null, 1);
 
-  // Remove XML/RDF metadata blocks that Canva or Adobe PDF generators embed
-  let cleaned = text.replace(/<\?xpacket[\s\S]*?\?>/gi, "");
-  cleaned = cleaned.replace(/<rdf:RDF[\s\S]*?<\/rdf:RDF>/gi, "");
-  cleaned = cleaned.replace(/<x:xmpmeta[\s\S]*?<\/x:xmpmeta>/gi, "");
-  cleaned = cleaned.replace(/<<[\s\S]*?>>/g, " ");
+    pdfParser.on("pdfParser_dataError", (errData: any) => {
+      reject(new Error(errData?.parserError || "pdf2json parse error"));
+    });
 
-  const lines = cleaned.split("\n");
-  const filtered = lines.filter((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return false;
+    pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+      try {
+        // pdf2json stores decoded text in pdfData.Pages[].Texts[].R[].T
+        const pages: any[] = pdfData?.Pages || [];
+        const lines: string[] = [];
 
-    // Filter out standard PDF structure strings
-    if (
-      trimmed.startsWith("%PDF-") ||
-      trimmed.includes("ReportLab") ||
-      trimmed.includes("Canva") ||
-      trimmed.includes("Adobe") ||
-      trimmed.includes("obj") ||
-      trimmed.includes("endobj") ||
-      trimmed.includes("stream") ||
-      trimmed.includes("endstream") ||
-      trimmed.includes("/BaseFont") ||
-      trimmed.includes("/Font") ||
-      trimmed.includes("/Type") ||
-      trimmed.includes("/Pages") ||
-      trimmed.includes("/StructTreeRoot") ||
-      trimmed.includes("/Metadata") ||
-      trimmed.includes("/MediaBox") ||
-      trimmed.includes("/ProcSet") ||
-      trimmed.includes("/XObject") ||
-      trimmed.includes("/FlateDecode") ||
-      trimmed.includes("xmlns:") ||
-      trimmed.includes("rdf:") ||
-      /^[\d\s]+obj$/.test(trimmed) ||
-      /^\d+\s+\d+\s+R$/.test(trimmed) ||
-      /^<<.*>>$/.test(trimmed)
-    ) {
-      return false;
-    }
+        for (const page of pages) {
+          const texts: any[] = page?.Texts || [];
+          const pageTokens: string[] = [];
+          for (const textItem of texts) {
+            const runs: any[] = textItem?.R || [];
+            for (const run of runs) {
+              if (run?.T) {
+                pageTokens.push(decodeURIComponent(run.T));
+              }
+            }
+          }
+          if (pageTokens.length > 0) {
+            lines.push(pageTokens.join(" "));
+          }
+        }
 
-    // Must contain some printable word characters
-    return /[a-zA-Z0-9]/.test(trimmed);
+        const fullText = lines.join("\n").replace(/\s{3,}/g, "  ").trim();
+        resolve(fullText);
+      } catch (e: any) {
+        reject(new Error("pdf2json data extraction failed: " + e.message));
+      }
+    });
+
+    pdfParser.parseBuffer(buffer);
   });
-
-  return filtered.join("\n").replace(/[^\x20-\x7E\n]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 /**
  * Extracts raw text from a PDF or DOCX file buffer.
- * Gracefully handles standard PDFs, Canva PDFs, and DOCX files.
+ * PDF: Uses pdf2json (pure Node.js, Vercel-safe).
+ * DOCX: Uses mammoth.
  */
-export async function extractTextFromBuffer(buffer: Buffer, mimeType: string): Promise<string> {
-  const isPdf = mimeType === "application/pdf" || mimeType.includes("pdf");
+export async function extractTextFromBuffer(
+  buffer: Buffer,
+  mimeType: string
+): Promise<string> {
+  const isPdf =
+    mimeType === "application/pdf" || mimeType.toLowerCase().includes("pdf");
 
   if (isPdf) {
-    // Attempt 1: Standard pdf-parse v2 PDFParse class
+    // Primary: pdf2json — pure Node.js, no worker, works on Vercel
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { PDFParse } = require("pdf-parse");
-      if (PDFParse) {
-        const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const result = await parser.getText();
-        await parser.destroy();
-        if (result && result.text && result.text.trim().length > 5) {
-          const cleanedText = cleanPdfBinaryArtifacts(result.text);
-          if (cleanedText.length > 5) return cleanedText;
-        }
+      const text = await extractPdfWithPdf2json(buffer);
+      if (text && text.trim().length > 20) {
+        console.log(
+          "[Extractor] pdf2json extracted",
+          text.length,
+          "chars from PDF"
+        );
+        return text.trim();
       }
     } catch (e1: any) {
-      console.warn("PDFParse attempt 1 failed:", e1?.message || e1);
+      console.warn("[Extractor] pdf2json failed:", e1?.message || e1);
     }
 
-    // Attempt 2: Node bundle entry point (pdf-parse/node)
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const pdfNode = require("pdf-parse/node");
-      const PDFParse = pdfNode.PDFParse || pdfNode;
-      if (PDFParse && typeof PDFParse === "function" && PDFParse.prototype?.getText) {
-        const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const result = await parser.getText();
-        await parser.destroy();
-        if (result && result.text && result.text.trim().length > 5) {
-          const cleanedText = cleanPdfBinaryArtifacts(result.text);
-          if (cleanedText.length > 5) return cleanedText;
-        }
-      }
-    } catch (e2: any) {
-      console.warn("pdf-parse/node attempt 2 failed:", e2?.message || e2);
-    }
+    // Fallback: printable ASCII extraction from buffer
+    console.warn("[Extractor] Falling back to buffer string extraction");
+    const rawText = buffer
+      .toString("latin1")
+      .replace(/[^\x20-\x7E\n\r\t]/g, " ")
+      .replace(/\s{4,}/g, "\n")
+      .trim();
+    return rawText;
+  }
 
-    // Attempt 3: Printable string extraction from buffer
-    const rawText = buffer.toString("utf-8");
-    const cleaned = cleanPdfBinaryArtifacts(rawText);
-    return cleaned;
-  } else if (
-    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+  if (
+    mimeType ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     mimeType === "application/msword" ||
-    mimeType.includes("word") ||
-    mimeType.includes("document")
+    mimeType.toLowerCase().includes("word") ||
+    mimeType.toLowerCase().includes("document")
   ) {
     try {
       const result = await mammoth.extractRawText({ buffer });
       if (result.value && result.value.trim().length > 0) {
+        console.log("[Extractor] mammoth extracted", result.value.length, "chars from DOCX");
         return result.value.trim();
       }
     } catch (error: any) {
-      console.warn("Mammoth DOCX extraction failed:", error?.message || error);
+      console.warn("[Extractor] Mammoth DOCX extraction failed:", error?.message || error);
     }
-
-    const rawText = buffer.toString("utf-8");
-    const cleaned = cleanPdfBinaryArtifacts(rawText);
-    return cleaned;
   }
 
-  const rawText = buffer.toString("utf-8");
-  const cleaned = cleanPdfBinaryArtifacts(rawText);
-  return cleaned;
+  // Generic fallback
+  return buffer
+    .toString("latin1")
+    .replace(/[^\x20-\x7E\n\r\t]/g, " ")
+    .replace(/\s{4,}/g, "\n")
+    .trim();
 }
