@@ -1,6 +1,4 @@
 import mammoth from "mammoth";
-import { join } from "path";
-import { pathToFileURL } from "url";
 
 /**
  * Safely decodes URI components extracted by pdf2json.
@@ -20,71 +18,45 @@ function safeDecodeComponent(str: string): string {
 }
 
 /**
- * Extracts text from a PDF buffer using pdfjs-dist.
+ * Extracts text from PDF buffer using pdf-parse (Pure JS, zero worker dependency).
  */
-async function extractPdfWithPdfjs(buffer: Buffer): Promise<string> {
-  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs" as string);
-
-  const workerPath = join(
-    process.cwd(),
-    "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
-  );
-  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
-
-  const doc = await pdfjsLib
-    .getDocument({
-      data: new Uint8Array(buffer),
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      useSystemFonts: true,
-      verbosity: 0,
-    })
-    .promise;
-
-  const pageTexts: string[] = [];
-  for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
-    const page = await doc.getPage(pageNum);
-    const content = await page.getTextContent();
-    const pageText = (content.items as any[])
-      .filter((item) => "str" in item)
-      .map((item) => (item as any).str)
-      .join(" ");
-    pageTexts.push(pageText);
-    page.cleanup();
-  }
-
-  await doc.destroy();
-  return pageTexts.join("\n").replace(/[ \t]{3,}/g, "  ").trim();
+async function extractPdfWithPdfParse(buffer: Buffer): Promise<string> {
+  const { PDFParse } = require("pdf-parse"); // eslint-disable-line @typescript-eslint/no-require-imports
+  const parser = new PDFParse({ data: buffer });
+  await parser.load();
+  const text = await parser.getText();
+  return text || "";
 }
 
 /**
  * Extracts raw text from a PDF or DOCX file buffer.
- * PDF  → pdfjs-dist -> pdf2json (with safeDecodeComponent) -> ASCII fallback
- * DOCX → mammoth
+ * Engine 1: pdf-parse (Pure JS, Vercel serverless compatible)
+ * Engine 2: pdf2json (with safeDecodeComponent)
+ * Engine 3: Printable ASCII & Stream Scrape
  */
 export async function extractTextFromBuffer(
   buffer: Buffer,
   mimeType: string
 ): Promise<string> {
-  const mime = mimeType.toLowerCase();
-  const isPdf = mime === "application/pdf" || mime.includes("pdf");
+  const mime = (mimeType || "").toLowerCase();
+  const isPdf = mime.includes("pdf") || buffer.toString("utf8", 0, 5).startsWith("%PDF");
 
   // ── PDF Extraction ──────────────────────────────────────────────────────────
   if (isPdf) {
+    // Engine 1: pdf-parse (Pure JS serverless)
     try {
-      const text = await extractPdfWithPdfjs(buffer);
-      if (text && text.trim().length > 30) {
-        console.log("[Extractor] pdfjs extracted", text.length, "chars");
+      const text = await extractPdfWithPdfParse(buffer);
+      if (text && text.trim().length > 20) {
+        console.log(`[Extractor] pdf-parse extracted ${text.trim().length} characters.`);
         return text.trim();
       }
-      console.warn("[Extractor] pdfjs returned empty text, trying pdf2json…");
     } catch (e1: any) {
-      console.warn("[Extractor] pdfjs failed:", e1?.message);
+      console.warn("[Extractor] pdf-parse failed:", e1?.message || e1);
     }
 
-    // Secondary fallback: pdf2json with safeDecodeComponent
+    // Engine 2: pdf2json (Secondary fallback)
     try {
-      const PDFParser = require("pdf2json"); // eslint-disable-line
+      const PDFParser = require("pdf2json"); // eslint-disable-line @typescript-eslint/no-require-imports
       const text = await new Promise<string>((resolve, reject) => {
         const parser = new PDFParser(null, 1);
         parser.on("pdfParser_dataError", (err: any) =>
@@ -106,21 +78,24 @@ export async function extractTextFromBuffer(
         });
         parser.parseBuffer(buffer);
       });
-      if (text && text.trim().length > 30) {
-        console.log("[Extractor] pdf2json extracted", text.length, "chars");
+
+      if (text && text.trim().length > 20) {
+        console.log(`[Extractor] pdf2json extracted ${text.trim().length} characters.`);
         return text.trim();
       }
     } catch (e2: any) {
-      console.warn("[Extractor] pdf2json failed:", e2?.message);
+      console.warn("[Extractor] pdf2json failed:", e2?.message || e2);
     }
 
-    // Last resort: printable-ASCII scrape
-    console.warn("[Extractor] Falling back to ASCII buffer scrape");
-    return buffer
+    // Engine 3: Printable ASCII / Stream Scrape Fallback
+    console.warn("[Extractor] Falling back to ASCII stream scrape.");
+    const scraped = buffer
       .toString("latin1")
       .replace(/[^\x20-\x7E\n\r\t]/g, " ")
       .replace(/\s{4,}/g, "\n")
       .trim();
+
+    return scraped;
   }
 
   // ── DOCX Extraction ─────────────────────────────────────────────────────────

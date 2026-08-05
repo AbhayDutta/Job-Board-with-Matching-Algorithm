@@ -49,9 +49,9 @@ export async function uploadResumeAction(formData: FormData) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user || session.user?.role !== "CANDIDATE") {
+    if (!session || !session.user || !session.user.id) {
       console.warn("[ResumeUpload] Unauthorized upload attempt.");
-      return { success: false, error: "Unauthorized. Candidates only." };
+      return { success: false, error: "Unauthorized. Please log in first." };
     }
 
     // Verify candidate user exists in database
