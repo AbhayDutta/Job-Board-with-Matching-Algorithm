@@ -5,7 +5,7 @@ import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { sendMagicLinkAction } from "@/app/actions/magic-link";
-import { AlertCircle, Loader2, CheckCircle2, Sparkles, Mail, KeyRound } from "lucide-react";
+import { AlertCircle, Loader2, Sparkles, Mail, KeyRound, MailCheck } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 import Navbar from "@/components/Navbar";
@@ -142,64 +142,85 @@ function LoginContent() {
       {/* Soft Ambient Glow Backdrop */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 h-80 w-80 rounded-full bg-[oklch(0.87_0.22_130/0.18)] dark:bg-[oklch(0.87_0.22_130/0.12)] blur-[80px] animate-breathe pointer-events-none" />
 
-      <motion.div
-        initial={shouldReduceMotion ? {} : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}
-        className="mx-auto max-w-sm w-full p-8 text-center bg-card/90 backdrop-blur-xl border border-border/80 rounded-3xl shadow-2xl ring-1 ring-accent/20 hover:ring-accent/40 transition-all duration-300"
-      >
-        {/* Header Badge & Title */}
-        <div className="mb-6">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest bg-secondary text-muted-foreground border border-border/60 mb-3">
-            <Sparkles className="h-3 w-3 text-[oklch(0.88_0.22_130)]" />
-            AUTHENTICATION
-          </span>
-          <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight mb-2">
-            Welcome back
-          </h1>
-          <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-            {mode === "magic"
-              ? "Enter your email to sign in instantly with a magic link."
-              : "Sign in with your email and password credentials."}
-          </p>
-        </div>
+      <AnimatePresence mode="wait">
+        {autoAuthenticating ? (
+          <motion.div
+            key="autoAuth"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="my-8 py-6 text-center space-y-3 font-mono text-xs text-muted-foreground"
+          >
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-foreground" />
+            <p>Authenticating your magic link...</p>
+          </motion.div>
+        ) : magicSent ? (
+          /* ── Confirmation Screen matching exact reference screenshot ── */
+          <motion.div
+            key="magicSentScreen"
+            initial={shouldReduceMotion ? {} : { opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+            className="mx-auto max-w-md w-full p-8 text-center"
+          >
+            {/* Green Circular Mail Badge */}
+            <div className="mx-auto h-16 w-16 rounded-full bg-[#0d2818] border border-[#1b432c] grid place-items-center mb-6 shadow-lg shadow-emerald-950/30">
+              <MailCheck className="h-7 w-7 text-emerald-400" />
+            </div>
 
-        <AnimatePresence mode="wait">
-          {autoAuthenticating ? (
-            <motion.div
-              key="autoAuth"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="my-8 py-6 text-center space-y-3 font-mono text-xs text-muted-foreground"
-            >
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-foreground" />
-              <p>Authenticating your magic link...</p>
-            </motion.div>
-          ) : magicSent ? (
-            <motion.div
-              key="magicSent"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="my-6 text-center space-y-4 p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono text-xs"
-            >
-              <CheckCircle2 className="h-8 w-8 mx-auto text-emerald-600 dark:text-emerald-400" />
-              <h3 className="font-bold text-sm text-foreground font-sans">Magic link sent!</h3>
-              <p className="text-muted-foreground text-[11px] leading-relaxed">
-                Check your inbox ({email}) for your instant sign-in link.
+            {/* Title */}
+            <h1 className="text-3xl sm:text-4xl font-sans font-bold text-foreground tracking-tight mb-4">
+              Check your email
+            </h1>
+
+            {/* Subtitle with bold recipient email */}
+            <p className="text-sm font-sans text-muted-foreground leading-relaxed max-w-sm mx-auto mb-8">
+              We sent a magic link to <strong className="text-foreground font-semibold">{email}</strong>. Click it to sign in instantly.
+            </p>
+
+            {/* Demo Mode direct link fallback if present */}
+            {magicUrl && (
+              <div className="pt-2 max-w-xs mx-auto space-y-3">
+                <a
+                  href={magicUrl}
+                  className="inline-block w-full py-3 px-5 rounded-xl bg-foreground text-background font-mono text-xs font-bold hover:bg-accent hover:text-black transition-all shadow-md"
+                >
+                  ✨ Direct Login Link (Demo Mode) →
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setMagicSent(false)}
+                  className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors underline cursor-pointer"
+                >
+                  Use a different email
+                </button>
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          /* ── Login Form Card ── */
+          <motion.div
+            key="loginCard"
+            initial={shouldReduceMotion ? {} : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}
+            className="mx-auto max-w-sm w-full p-8 text-center bg-card/90 backdrop-blur-xl border border-border/80 rounded-3xl shadow-2xl ring-1 ring-accent/20 hover:ring-accent/40 transition-all duration-300"
+          >
+            {/* Header Badge & Title */}
+            <div className="mb-6">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest bg-secondary text-muted-foreground border border-border/60 mb-3">
+                <Sparkles className="h-3 w-3 text-[oklch(0.88_0.22_130)]" />
+                AUTHENTICATION
+              </span>
+              <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight mb-2">
+                Welcome back
+              </h1>
+              <p className="text-xs font-mono text-muted-foreground leading-relaxed">
+                {mode === "magic"
+                  ? "Enter your email to sign in instantly with a magic link."
+                  : "Sign in with your email and password credentials."}
               </p>
+            </div>
 
-              {magicUrl && (
-                <div className="pt-2">
-                  <a
-                    href={magicUrl}
-                    className="inline-block w-full py-2.5 px-4 rounded-xl bg-foreground text-background font-mono text-[11px] font-bold hover:bg-accent hover:text-black transition-colors"
-                  >
-                    ✨ Direct Login Link (Demo Mode) →
-                  </a>
-                </div>
-              )}
-            </motion.div>
-          ) : (
             <div className="space-y-3 text-left">
               <AnimatePresence>
                 {error && (
@@ -326,16 +347,16 @@ function LoginContent() {
                 </form>
               )}
             </div>
-          )}
-        </AnimatePresence>
 
-        <p className="mt-8 text-[10px] font-mono text-muted-foreground text-center border-t border-border/40 pt-4">
-          {"Don't"} have an account?{" "}
-          <Link href="/register" className="text-foreground hover:text-accent underline font-semibold transition-colors">
-            Sign up free
-          </Link>
-        </p>
-      </motion.div>
+            <p className="mt-8 text-[10px] font-mono text-muted-foreground text-center border-t border-border/40 pt-4">
+              {"Don't"} have an account?{" "}
+              <Link href="/register" className="text-foreground hover:text-accent underline font-semibold transition-colors">
+                Sign up free
+              </Link>
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
