@@ -130,11 +130,31 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      if (user && user.email) {
-        token.role = (user as any).role || "CANDIDATE";
+    async jwt({ token, user, trigger, session: updateSession }) {
+      if (user) {
         token.id = user.id;
+        token.role = (user as any).role || "CANDIDATE";
       }
+
+      if (trigger === "update" && updateSession?.role) {
+        token.role = updateSession.role;
+      }
+
+      // Always sync token.role with current database role for token.id
+      if (token?.id) {
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true },
+          });
+          if (dbUser) {
+            token.role = dbUser.role;
+          }
+        } catch (e) {
+          console.error("[JWT Callback Error]:", e);
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {

@@ -23,11 +23,17 @@ import UserProfileModal from "@/components/UserProfileModal";
 import { SignOutButton } from "@/components/SignOutButton";
 import RoleSwitchButton from "@/components/RoleSwitchButton";
 
-export default async function CandidateJobsPage() {
-  const session = await getSession(authOptions);
+import { getServerSession } from "next-auth";
 
-  if (!session || session.user?.role !== "CANDIDATE") {
+export default async function CandidateJobsPage() {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !session.user?.id) {
     redirect("/login");
+  }
+
+  if (session.user.role === "EMPLOYER") {
+    redirect("/dashboard/employer/jobs");
   }
 
   // Load user record

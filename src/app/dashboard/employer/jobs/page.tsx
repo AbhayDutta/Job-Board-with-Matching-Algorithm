@@ -18,8 +18,12 @@ import { db } from "@/lib/db";
 export default async function EmployerJobsPage() {
   const session = await getServerSession(authOptions);
 
-  if (!session || session.user?.role !== "EMPLOYER") {
+  if (!session || !session.user?.id) {
     redirect("/login");
+  }
+
+  if (session.user.role === "CANDIDATE") {
+    redirect("/dashboard/candidate/jobs");
   }
 
   const userRecord = await db.user.findUnique({
