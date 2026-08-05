@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { verifyMagicToken } from "@/lib/magic-token";
 
 const AUTH_SECRET = process.env.NEXTAUTH_SECRET || "fitboard-auth-secret-keys-neon-postgress-3453";
 
@@ -13,8 +14,66 @@ const providers: any[] = [
     credentials: {
       email: { label: "Email", type: "email" },
       password: { label: "Password", type: "password" },
+      magicToken: { label: "Magic Token", type: "text" },
     },
     async authorize(credentials) {
+      // ── 1. Passwordless Magic Link Authentication ──────────────────────────
+      if (credentials?.magicToken) {
+        const payload = verifyMagicToken(credentials.magicToken);
+        if (!payload) {
+          console.warn("[Auth] Magic Token verification failed or token expired.");
+          return null;
+        }
+
+        const lowerEmail = payload.email.toLowerCase().trim();
+
+        let user = await db.user.findFirst({
+          where: {
+            OR: [
+              { email: lowerEmail },
+              { email: { equals: lowerEmail, mode: "insensitive" } },
+            ],
+          },
+        });
+
+        if (!user) {
+          const userName = payload.name || lowerEmail.split("@")[0];
+          const userRole = payload.role || "CANDIDATE";
+
+          user = await db.user.create({
+            data: {
+              email: lowerEmail,
+              name: userName,
+              password: "MAGIC_LINK_USER",
+              role: userRole,
+              ...(userRole === "CANDIDATE"
+                ? {
+                    candidateProfile: {
+                      create: {
+                        name: userName,
+                        skills: [],
+                        experience: [],
+                        education: [],
+                      },
+                    },
+                  }
+                : {}),
+            },
+          });
+          console.log(`[Auth MagicLink] Auto-created new ${userRole} user: ${user.id} (${lowerEmail})`);
+        } else {
+          console.log(`[Auth MagicLink] Authenticated existing user: ${user.id} (${lowerEmail})`);
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          name: user.name,
+        };
+      }
+
+      // ── 2. Standard Password Credentials Authentication ─────────────────────
       if (!credentials?.email || !credentials?.password) {
         return null;
       }
@@ -122,12 +181,9 @@ export const authOptions: NextAuthOptions = {
               },
             });
             console.log(`[Auth OAuth] Created new candidate user ${newUser.id} via ${account.provider} (${lowerEmail})`);
-          } else {
-            console.log(`[Auth OAuth] Logged in existing user ${existingUser.id} via ${account.provider} (${lowerEmail})`);
           }
         } catch (err) {
           console.error("[Auth OAuth] Auto-registration error:", err);
-          // Allow sign in even if DB creation failed so session isn't blocked, or return true
         }
       }
       return true;

@@ -4,28 +4,29 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { registerSchema, RegisterFormData } from "@/lib/validations";
-import { registerUser } from "@/app/actions/auth";
-import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { sendMagicLinkAction } from "@/app/actions/magic-link";
+import { CheckCircle2, AlertCircle, Loader2, Sparkles, Mail, KeyRound } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 import Navbar from "@/components/Navbar";
 import DoodlePatternBackground from "@/components/DoodlePatternBackground";
 
 export default function RegisterPage() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [role, setRole] = useState<"CANDIDATE" | "EMPLOYER">("CANDIDATE");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [magicSent, setMagicSent] = useState(false);
+  const [magicUrl, setMagicUrl] = useState<string | null>(null);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
   const router = useRouter();
   const { data: session, status } = useSession();
   const shouldReduceMotion = useReducedMotion();
 
-  // If user is already authenticated, redirect them directly to dashboard
+  // Auto redirect logged in users directly to dashboard
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
       if (session.user.role === "EMPLOYER") {
@@ -36,61 +37,34 @@ export default function RegisterPage() {
     }
   }, [session, status, router]);
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    formState: { errors },
-  } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      role: "CANDIDATE",
-    },
-  });
-
-  const handleRoleChange = (newRole: "CANDIDATE" | "EMPLOYER") => {
-    setRole(newRole);
-    setValue("role", newRole, { shouldValidate: true });
-  };
-
-  const onSubmit = async (data: RegisterFormData) => {
+  const handleSendMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
+
+    if (!email || !email.includes("@")) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const res = await registerUser({
-        name: data.name || "",
-        email: data.email,
-        password: data.password,
-        role: data.role,
+      const res = await sendMagicLinkAction({
+        email,
+        name: name || undefined,
+        role,
       });
 
-      if (!res.success) {
-        setError(res.error || "An error occurred during registration.");
-        setLoading(false);
+      if (res.success) {
+        setMagicSent(true);
+        if (res.magicLinkUrl) setMagicUrl(res.magicLinkUrl);
       } else {
-        setSuccess(true);
-        // Instant Auto-Login after registration so user never needs to sign in manually!
-        const autoSignIn = await signIn("credentials", {
-          email: data.email,
-          password: data.password,
-          redirect: false,
-        });
-
-        if (!autoSignIn?.error) {
-          if (data.role === "EMPLOYER") {
-            router.push("/dashboard/employer/jobs");
-          } else {
-            router.push("/dashboard/candidate/jobs");
-          }
-          router.refresh();
-        } else {
-          router.push("/login");
-        }
+        setError(res.error || "Failed to send magic link.");
       }
     } catch (err) {
       console.error(err);
       setError("An unexpected error occurred.");
+    } finally {
       setLoading(false);
     }
   };
@@ -118,34 +92,47 @@ export default function RegisterPage() {
           transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}
           className="mx-auto max-w-sm w-full p-8 text-center bg-card/90 backdrop-blur-xl border border-border/80 rounded-3xl shadow-2xl ring-1 ring-accent/20 hover:ring-accent/40 transition-all duration-300"
         >
-          {/* Header Badge & Title */}
+          {/* Header Badge & Title matching user reference image */}
           <div className="mb-6">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest bg-secondary text-muted-foreground border border-border/60 mb-3">
-              <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.88_0.22_130)] animate-pulse" />
-              Get Started
+              <Sparkles className="h-3 w-3 text-[oklch(0.88_0.22_130)]" />
+              GET STARTED
             </span>
             <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight mb-2">
               Create your account
             </h1>
             <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-              Choose your role and enter your details to register instantly.
+              Enter your details and {"we'll"} send a magic link to sign in instantly.
             </p>
           </div>
 
           <AnimatePresence mode="wait">
-            {success ? (
+            {magicSent ? (
               <motion.div
-                key="success"
+                key="magicSent"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="my-6 text-center space-y-2 p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono text-xs"
+                className="my-6 text-center space-y-4 p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono text-xs"
               >
-                <CheckCircle2 className="h-8 w-8 mx-auto text-emerald-600" />
-                <h3 className="font-bold">Account Created!</h3>
-                <p className="text-muted-foreground text-[11px]">Redirecting to login...</p>
+                <CheckCircle2 className="h-8 w-8 mx-auto text-emerald-600 dark:text-emerald-400" />
+                <h3 className="font-bold text-sm text-foreground font-sans">Magic link sent!</h3>
+                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                  Check your inbox ({email}) for your magic sign-in link.
+                </p>
+
+                {magicUrl && (
+                  <div className="pt-2">
+                    <a
+                      href={magicUrl}
+                      className="inline-block w-full py-2.5 px-4 rounded-xl bg-foreground text-background font-mono text-[11px] font-bold hover:bg-accent hover:text-black transition-colors"
+                    >
+                      ✨ Direct Login Link (Demo Mode) →
+                    </a>
+                  </div>
+                )}
               </motion.div>
             ) : (
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5 text-left">
+              <form onSubmit={handleSendMagicLink} className="space-y-3.5 text-left">
                 <AnimatePresence>
                   {error && (
                     <motion.div
@@ -162,11 +149,11 @@ export default function RegisterPage() {
                   )}
                 </AnimatePresence>
 
-                {/* Minimalist Monospace Role Switcher */}
-                <div className="p-1 rounded-xl bg-secondary/60 border border-border/80 grid grid-cols-2 gap-1 text-[11px] font-mono">
+                {/* Role Switcher */}
+                <div className="p-1 rounded-xl bg-secondary/60 border border-border/80 grid grid-cols-2 gap-1 text-[11px] font-mono mb-1">
                   <button
                     type="button"
-                    onClick={() => handleRoleChange("CANDIDATE")}
+                    onClick={() => setRole("CANDIDATE")}
                     className={`py-1.5 rounded-lg transition-all cursor-pointer ${
                       role === "CANDIDATE"
                         ? "bg-background text-foreground border border-border/60 font-bold shadow-xs"
@@ -177,7 +164,7 @@ export default function RegisterPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleRoleChange("EMPLOYER")}
+                    onClick={() => setRole("EMPLOYER")}
                     className={`py-1.5 rounded-lg transition-all cursor-pointer ${
                       role === "EMPLOYER"
                         ? "bg-background text-foreground border border-border/60 font-bold shadow-xs"
@@ -189,61 +176,47 @@ export default function RegisterPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="reg-name-input" className="sr-only">name</label>
+                  <label htmlFor="reg-name-input" className="sr-only">Your name</label>
                   <input
                     id="reg-name-input"
                     type="text"
                     placeholder="Your name"
-                    {...register("name")}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     className="w-full bg-secondary/60 border border-border/80 rounded-xl px-4 py-3 text-xs text-foreground font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-xs"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="reg-email-input" className="sr-only">email</label>
+                  <label htmlFor="reg-email-input" className="sr-only">Email address</label>
                   <input
                     id="reg-email-input"
                     type="email"
+                    required
                     placeholder="you@example.com"
-                    {...register("email")}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-secondary/60 border border-border/80 rounded-xl px-4 py-3 text-xs text-foreground font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-xs"
                   />
-                  {errors.email && (
-                    <p className="text-[11px] font-mono text-destructive pt-1 pl-1">
-                      {errors.email.message}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="reg-password-input" className="sr-only">password</label>
-                  <input
-                    id="reg-password-input"
-                    type="password"
-                    placeholder="Password (min 6 chars)"
-                    {...register("password")}
-                    className="w-full bg-secondary/60 border border-border/80 rounded-xl px-4 py-3 text-xs text-foreground font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-xs"
-                  />
-                  {errors.password && (
-                    <p className="text-[11px] font-mono text-destructive pt-1 pl-1">
-                      {errors.password.message}
-                    </p>
-                  )}
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs font-mono bg-foreground text-background hover:bg-accent hover:text-black active:scale-[0.97] font-bold transition-all cursor-pointer disabled:opacity-40 shadow-sm"
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-xs font-mono bg-foreground text-background hover:bg-accent hover:text-black active:scale-[0.97] font-bold transition-all cursor-pointer disabled:opacity-40 shadow-sm"
                 >
                   {loading ? (
                     <span className="flex items-center gap-2">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Registering...
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending magic link...
                     </span>
                   ) : (
-                    "Create Account →"
+                    "Send magic link"
                   )}
                 </button>
+
+                <p className="text-[11px] font-mono text-muted-foreground text-center pt-1 leading-normal">
+                  No password needed. {"We'll"} create your account automatically.
+                </p>
               </form>
             )}
           </AnimatePresence>
@@ -325,7 +298,7 @@ export default function RegisterPage() {
 
       {/* Fitboard Minimal Theme Footer */}
       <footer className="w-full px-6 pb-8 text-center text-xs font-mono text-muted-foreground border-t border-border/60 pt-6">
-        Fitboard Skill Matching Engine · Cosine Similarity Algorithm
+        Fitboard Skill Matching Engine · Passwordless Authentication
       </footer>
     </div>
   );
