@@ -27,13 +27,10 @@ export const authOptions: NextAuthOptions = {
           const lowerEmail = payload.email.toLowerCase().trim();
           const selectedRole = payload.role || "CANDIDATE";
 
-          let user = await db.user.findFirst({
-            where: {
-              OR: [
-                { email: lowerEmail },
-                { email: { equals: lowerEmail, mode: "insensitive" } },
-              ],
-            },
+          // Fast single indexed query including candidate profile
+          let user = await db.user.findUnique({
+            where: { email: lowerEmail },
+            include: { candidateProfile: true },
           });
 
           if (!user) {
@@ -54,20 +51,21 @@ export const authOptions: NextAuthOptions = {
                   },
                 },
               },
+              include: { candidateProfile: true },
             });
             console.log(`[Auth MagicLink] Auto-created new ${selectedRole} user: ${user.id} (${lowerEmail})`);
           } else {
-            // Dual-Role Support: Update user role to whichever role they picked for this session
-            user = await db.user.update({
-              where: { id: user.id },
-              data: { role: selectedRole },
-            });
+            // Dual-Role Support: Update user role only if changed for this session
+            if (user.role !== selectedRole) {
+              user = await db.user.update({
+                where: { id: user.id },
+                data: { role: selectedRole },
+                include: { candidateProfile: true },
+              });
+            }
 
-            // Ensure CandidateProfile exists for dual-role users
-            const existingProfile = await db.candidateProfile.findUnique({
-              where: { userId: user.id },
-            });
-            if (!existingProfile) {
+            // Ensure CandidateProfile exists if missing
+            if (!user.candidateProfile) {
               await db.candidateProfile.create({
                 data: {
                   userId: user.id,
@@ -99,14 +97,8 @@ export const authOptions: NextAuthOptions = {
           const rawEmail = credentials.email.trim();
           const lowerEmail = rawEmail.toLowerCase();
 
-          const user = await db.user.findFirst({
-            where: {
-              OR: [
-                { email: rawEmail },
-                { email: lowerEmail },
-                { email: { equals: lowerEmail, mode: "insensitive" } },
-              ],
-            },
+          const user = await db.user.findUnique({
+            where: { email: lowerEmail },
           });
 
           if (!user || !user.password) {
@@ -140,30 +132,8 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user && user.email) {
-        try {
-          const rawEmail = user.email.trim();
-          const lowerEmail = rawEmail.toLowerCase();
-          const dbUser = await db.user.findFirst({
-            where: {
-              OR: [
-                { email: rawEmail },
-                { email: lowerEmail },
-                { email: { equals: lowerEmail, mode: "insensitive" } },
-              ],
-            },
-          });
-          if (dbUser) {
-            token.role = dbUser.role;
-            token.id = dbUser.id;
-          } else {
-            token.role = (user as any).role || "CANDIDATE";
-            token.id = user.id;
-          }
-        } catch (err) {
-          console.error("[Auth JWT] Error fetching user role:", err);
-          token.role = (user as any).role || "CANDIDATE";
-          token.id = user.id;
-        }
+        token.role = (user as any).role || "CANDIDATE";
+        token.id = user.id;
       }
       return token;
     },

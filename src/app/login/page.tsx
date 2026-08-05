@@ -39,6 +39,20 @@ function LoginContent() {
         setAutoAuthenticating(true);
         setError(null);
         try {
+          let targetRole = "CANDIDATE";
+          try {
+            const rawPayload = magicToken.split(".")[0];
+            const parsed = JSON.parse(atob(rawPayload));
+            if (parsed.role === "EMPLOYER") targetRole = "EMPLOYER";
+          } catch (e) {
+            console.error("Token payload decode error", e);
+          }
+
+          const targetUrl =
+            targetRole === "EMPLOYER"
+              ? "/dashboard/employer/jobs"
+              : "/dashboard/candidate/jobs";
+
           const res = await signIn("credentials", {
             magicToken,
             redirect: false,
@@ -48,14 +62,8 @@ function LoginContent() {
             setError("Magic link verification failed or expired. Please request a new one.");
             setAutoAuthenticating(false);
           } else {
-            const sessionRes = await fetch("/api/auth/session");
-            const sessData = await sessionRes.json();
-            if (sessData?.user?.role === "EMPLOYER") {
-              router.push("/dashboard/employer/jobs");
-            } else {
-              router.push("/dashboard/candidate/jobs");
-            }
-            router.refresh();
+            // Direct instant browser redirect
+            window.location.href = targetUrl;
           }
         } catch (err) {
           console.error(err);
@@ -66,7 +74,7 @@ function LoginContent() {
 
       handleMagicAuth();
     }
-  }, [magicToken, router]);
+  }, [magicToken]);
 
   // Auto redirect logged in users directly to dashboard
   useEffect(() => {
