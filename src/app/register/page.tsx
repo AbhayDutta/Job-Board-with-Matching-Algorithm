@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { sendMagicLinkAction } from "@/app/actions/magic-link";
-import { AlertCircle, Loader2, Sparkles, MailCheck } from "lucide-react";
+import { AlertCircle, Loader2, Sparkles, MailCheck, Mail } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 import Navbar from "@/components/Navbar";
@@ -105,24 +105,24 @@ export default function RegisterPage() {
                 We sent a magic link to <strong className="text-foreground font-semibold">{email}</strong>. Click it to sign in instantly.
               </p>
 
-              {/* Demo Mode direct link fallback if present */}
-              {magicUrl && (
-                <div className="pt-2 max-w-xs mx-auto space-y-3">
-                  <a
-                    href={magicUrl}
-                    className="inline-block w-full py-3 px-5 rounded-xl bg-foreground text-background font-mono text-xs font-bold hover:bg-accent hover:text-black transition-all shadow-md"
-                  >
-                    ✨ Direct Login Link (Demo Mode) →
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setMagicSent(false)}
-                    className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors underline cursor-pointer"
-                  >
-                    Use a different email
-                  </button>
-                </div>
-              )}
+              {/* Open Email Client action */}
+              <div className="pt-2 max-w-xs mx-auto space-y-3">
+                <a
+                  href={email.toLowerCase().endsWith("@gmail.com") ? "https://mail.google.com" : `https://${email.split("@")[1] || "gmail.com"}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 w-full py-3 px-5 rounded-xl bg-foreground text-background font-mono text-xs font-bold hover:bg-accent hover:text-black transition-all shadow-md"
+                >
+                  <Mail className="h-4 w-4" /> Open Gmail →
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setMagicSent(false)}
+                  className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors underline cursor-pointer block w-full text-center"
+                >
+                  Use a different email
+                </button>
+              </div>
             </motion.div>
           ) : (
             /* ── Registration Form Card ── */
