@@ -39,29 +39,40 @@ export async function sendApplicationStatusEmail({
 
   bodyText += `\nBest regards,\n${companyName} Hiring Team\nFitboard Platform`;
 
-  console.log(`[Email Notification] Sending to: ${to}`);
+  console.log(`[Email Notification] Attempting send to: ${to}`);
   console.log(`[Email Subject]: ${subject}`);
-  console.log(`[Email Body]:\n${bodyText}`);
 
   if (!resend) {
     console.warn(
-      "[Resend SDK] RESEND_API_KEY is not set. Email logged above instead of sending."
+      "[Resend SDK] RESEND_API_KEY is not set in environment variables. Email logged locally instead of sending."
     );
     return { success: true, simulated: true };
   }
 
   try {
     const fromAddress = process.env.RESEND_FROM_EMAIL || "Fitboard <onboarding@resend.dev>";
-    const data = await resend.emails.send({
+
+    // Resend SDK returns { data, error }
+    const response = await resend.emails.send({
       from: fromAddress,
       to: [to],
       subject,
       text: bodyText,
     });
 
-    return { success: true, data };
+    if (response.error) {
+      console.error("[Resend API Error]:", response.error);
+      return {
+        success: false,
+        error: response.error.message || "Resend API returned an error.",
+        details: response.error,
+      };
+    }
+
+    console.log(`[Email Notification] Successfully sent email to ${to}, ID:`, response.data?.id);
+    return { success: true, data: response.data };
   } catch (error: any) {
-    console.error("[Resend Error]:", error);
-    return { success: false, error: error.message || "Failed to send email" };
+    console.error("[Resend Exception Error]:", error?.message || error, error?.stack);
+    return { success: false, error: error?.message || "Failed to send email" };
   }
 }

@@ -4,18 +4,15 @@ import { db } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import fs from "fs/promises";
 import path from "path";
-import os from "os";
 import { extractTextFromBuffer } from "@/lib/extractor";
 import { parseResumeWithGemini } from "@/lib/gemini";
 import { calculateMatchScore } from "@/lib/matching";
 
+// Configure Vercel serverless function max duration (if applicable)
+
 /**
  * Recalculates and updates the match score for all job applications submitted by a candidate.
- *
- * @param candidateId User ID of the candidate.
- * @param candidateSkills Current list of skills from the candidate's profile.
  */
 async function updateAppliedJobsScores(candidateId: string, candidateSkills: string[]) {
   try {
@@ -37,18 +34,23 @@ async function updateAppliedJobsScores(candidateId: string, candidateSkills: str
       });
     }
   } catch (error) {
-    console.error("Error updating application match scores:", error);
+    console.error("[ResumeUpload] Error updating application match scores:", error);
   }
 }
 
 /**
- * Handles resume upload, text extraction, and parsing via the Gemini API.
+ * Handles resume upload, text extraction, and parsing via Gemini / rule-based parser.
+ * Operates purely in-memory (no disk writes) for Vercel serverless compatibility.
  */
 export async function uploadResumeAction(formData: FormData) {
+  const startTime = Date.now();
+  console.log("[ResumeUpload] Starting resume processing flow...");
+
   try {
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user || session.user?.role !== "CANDIDATE") {
+      console.warn("[ResumeUpload] Unauthorized upload attempt.");
       return { success: false, error: "Unauthorized. Candidates only." };
     }
 
@@ -61,6 +63,7 @@ export async function uploadResumeAction(formData: FormData) {
     }
 
     if (!dbUser) {
+      console.error("[ResumeUpload] User session invalid or DB record missing:", session.user.id);
       return { success: false, error: "User session expired. Please log out and log in again." };
     }
 
@@ -68,8 +71,21 @@ export async function uploadResumeAction(formData: FormData) {
 
     const file = formData.get("resume") as File | null;
     if (!file || file.size === 0) {
+      console.warn("[ResumeUpload] No file provided in request body.");
       return { success: false, error: "No file selected for upload." };
     }
+
+    // Vercel serverless payload size check (4.5MB limit)
+    const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      console.warn(`[ResumeUpload] File size (${file.size} bytes) exceeds 4.5MB Vercel limit.`);
+      return {
+        success: false,
+        error: "File size exceeds the 4.5MB server limit. Please upload a smaller PDF or DOCX file.",
+      };
+    }
+
+    console.log(`[ResumeUpload] Processing file: ${file.name} (${file.size} bytes, type: ${file.type})`);
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
@@ -77,21 +93,13 @@ export async function uploadResumeAction(formData: FormData) {
     const fileExtension = path.extname(file.name) || ".pdf";
     const uniqueFileName = `${userId}_${Date.now()}${fileExtension}`;
 
-    // Write file to temporary OS directory (Vercel serverless compatible)
-    try {
-      const uploadsDir = path.join(os.tmpdir(), "uploads");
-      await fs.mkdir(uploadsDir, { recursive: true });
-      const filePath = path.join(uploadsDir, uniqueFileName);
-      await fs.writeFile(filePath, buffer);
-    } catch (diskErr) {
-      console.warn("Serverless disk write skipped:", diskErr);
-    }
-
-    // Step 1: Extract Text
+    // Step 1: Extract Text directly from in-memory buffer (No disk write)
     let rawText = "";
     try {
       rawText = await extractTextFromBuffer(buffer, file.type);
+      console.log(`[ResumeUpload] Text extraction succeeded. Extracted ${rawText.length} characters.`);
     } catch (err: any) {
+      console.error("[ResumeUpload] Text extraction failed:", err?.message || err, err?.stack);
       return {
         success: false,
         error: `Text extraction failed: ${err?.message || err}. Please verify the file format.`,
@@ -105,8 +113,13 @@ export async function uploadResumeAction(formData: FormData) {
 
     try {
       parsedData = await parseResumeWithGemini(rawText);
+      console.log(`[ResumeUpload] Resume parsing succeeded in ${Date.now() - startTime}ms:`, {
+        skillsCount: parsedData.skills.length,
+        educationCount: parsedData.education.length,
+        experienceCount: parsedData.experience.length,
+      });
     } catch (err: any) {
-      console.error("LLM parser failed, falling back to manual entry option:", err);
+      console.error("[ResumeUpload] LLM parser failed:", err?.message || err, err?.stack);
       parserFailed = true;
       parserErrorMessage = err?.message || String(err);
     }
@@ -145,7 +158,7 @@ export async function uploadResumeAction(formData: FormData) {
       };
     }
 
-    // Success path: Parsed details successfully
+    // Success path: Save parsed details to database
     updatedProfile = await db.candidateProfile.upsert({
       where: { userId },
       update: {
@@ -164,7 +177,9 @@ export async function uploadResumeAction(formData: FormData) {
       },
     });
 
-    // Update match scores for all job applications this candidate has submitted
+    console.log(`[ResumeUpload] Profile updated in DB for user ${userId}. Total time: ${Date.now() - startTime}ms`);
+
+    // Update match scores for all job applications submitted by this candidate
     await updateAppliedJobsScores(userId, parsedData.skills);
 
     revalidatePath("/dashboard/candidate/jobs");
@@ -180,7 +195,7 @@ export async function uploadResumeAction(formData: FormData) {
       },
     };
   } catch (error: any) {
-    console.error("Upload resume action error:", error);
+    console.error("[ResumeUpload] Fatal error during uploadResumeAction:", error?.message || error, error?.stack);
     return {
       success: false,
       error: `Upload Error: ${error?.message || "An unexpected error occurred during resume upload."}`,
@@ -244,7 +259,7 @@ export async function updateCandidateProfile(skills: string[], education: string
       },
     };
   } catch (error: any) {
-    console.error("Update candidate profile error:", error);
+    console.error("[CandidateProfile] Update error:", error?.message || error, error?.stack);
     return { success: false, error: `Update Error: ${error?.message || "Failed to update profile."}` };
   }
 }

@@ -73,7 +73,7 @@ export default function ResumeDropzone({ onSuccess, currentResumeUrl }: ResumeDr
     if (fileRejections.length > 0) {
       const rejection = fileRejections[0];
       if (rejection.errors[0]?.code === "file-too-large") {
-        toast.error("File size exceeds 10MB limit.");
+        toast.error("File size exceeds 4.5MB Vercel serverless limit.");
       } else if (rejection.errors[0]?.code === "file-invalid-type") {
         toast.error("Invalid file format. Please upload PDF or DOCX files.");
       } else {
@@ -94,7 +94,7 @@ export default function ResumeDropzone({ onSuccess, currentResumeUrl }: ResumeDr
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
       "application/msword": [".doc"],
     },
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: Math.floor(4.5 * 1024 * 1024), // 4.5MB Vercel limit
     multiple: false,
   });
 

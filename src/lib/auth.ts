@@ -34,6 +34,7 @@ const providers: any[] = [
         });
 
         if (!user || !user.password) {
+          console.warn("[Auth] Credentials login failed: user not found or no password hash for", lowerEmail);
           return null;
         }
 
@@ -43,6 +44,7 @@ const providers: any[] = [
         );
 
         if (!isPasswordCorrect) {
+          console.warn("[Auth] Credentials login failed: invalid password for", lowerEmail);
           return null;
         }
 
@@ -50,9 +52,10 @@ const providers: any[] = [
           id: user.id,
           email: user.email,
           role: user.role,
+          name: user.name,
         };
       } catch (err) {
-        console.error("Authorize error:", err);
+        console.error("[Auth] Authorize exception error:", err);
         return null;
       }
     },
@@ -82,17 +85,29 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === "google" || account?.provider === "github") {
-        if (!user.email) return false;
+        if (!user.email) {
+          console.error("[Auth OAuth] No email returned by provider", account.provider);
+          return false;
+        }
         try {
-          const existingUser = await db.user.findUnique({
-            where: { email: user.email },
+          const rawEmail = user.email.trim();
+          const lowerEmail = rawEmail.toLowerCase();
+
+          const existingUser = await db.user.findFirst({
+            where: {
+              OR: [
+                { email: rawEmail },
+                { email: lowerEmail },
+                { email: { equals: lowerEmail, mode: "insensitive" } },
+              ],
+            },
           });
 
           if (!existingUser) {
-            const userName = user.name || user.email.split("@")[0];
-            await db.user.create({
+            const userName = user.name || rawEmail.split("@")[0];
+            const newUser = await db.user.create({
               data: {
-                email: user.email,
+                email: lowerEmail,
                 name: userName,
                 password: "OAUTH_EXTERNAL_USER",
                 role: "CANDIDATE",
@@ -101,13 +116,18 @@ export const authOptions: NextAuthOptions = {
                     name: userName,
                     skills: [],
                     experience: [],
+                    education: [],
                   },
                 },
               },
             });
+            console.log(`[Auth OAuth] Created new candidate user ${newUser.id} via ${account.provider} (${lowerEmail})`);
+          } else {
+            console.log(`[Auth OAuth] Logged in existing user ${existingUser.id} via ${account.provider} (${lowerEmail})`);
           }
         } catch (err) {
-          console.error("OAuth auto-registration error:", err);
+          console.error("[Auth OAuth] Auto-registration error:", err);
+          // Allow sign in even if DB creation failed so session isn't blocked, or return true
         }
       }
       return true;
@@ -115,8 +135,16 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user && user.email) {
         try {
-          const dbUser = await db.user.findUnique({
-            where: { email: user.email },
+          const rawEmail = user.email.trim();
+          const lowerEmail = rawEmail.toLowerCase();
+          const dbUser = await db.user.findFirst({
+            where: {
+              OR: [
+                { email: rawEmail },
+                { email: lowerEmail },
+                { email: { equals: lowerEmail, mode: "insensitive" } },
+              ],
+            },
           });
           if (dbUser) {
             token.role = dbUser.role;
@@ -125,7 +153,8 @@ export const authOptions: NextAuthOptions = {
             token.role = (user as any).role || "CANDIDATE";
             token.id = user.id;
           }
-        } catch {
+        } catch (err) {
+          console.error("[Auth JWT] Error fetching user role:", err);
           token.role = (user as any).role || "CANDIDATE";
           token.id = user.id;
         }
@@ -146,7 +175,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days persistent session
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: AUTH_SECRET,
 };

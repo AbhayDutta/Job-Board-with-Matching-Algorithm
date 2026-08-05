@@ -103,7 +103,7 @@ export async function updateApplicationStatus(
 
     // Send transactional email notification if status changed
     if (application.status !== newStatus || interviewDate) {
-      await sendApplicationStatusEmail({
+      const emailRes = await sendApplicationStatusEmail({
         to: application.candidate.email,
         candidateName,
         jobTitle: application.job.title,
@@ -112,6 +112,13 @@ export async function updateApplicationStatus(
         interviewDate: updateData.interviewDate,
         meetingLink: calendarEventLink,
       });
+
+      if (!emailRes.success) {
+        console.error(
+          `[ApplicationStatus] Failed to send email to ${application.candidate.email}:`,
+          emailRes.error
+        );
+      }
     }
 
     revalidatePath(`/dashboard/employer/jobs/${application.jobId}`);
