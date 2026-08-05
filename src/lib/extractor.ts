@@ -3,17 +3,28 @@ import { join } from "path";
 import { pathToFileURL } from "url";
 
 /**
- * Extracts text from a PDF buffer using pdfjs-dist (already installed as a
- * dependency of pdf-parse). Uses the bundled legacy build + bundled worker,
- * so it works in Vercel serverless without any extra files.
+ * Safely decodes URI components extracted by pdf2json.
+ * Prevents URIError: URI malformed crashes when PDF text contains literal % symbols.
+ */
+function safeDecodeComponent(str: string): string {
+  if (!str) return "";
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    try {
+      return unescape(str);
+    } catch {
+      return str;
+    }
+  }
+}
+
+/**
+ * Extracts text from a PDF buffer using pdfjs-dist.
  */
 async function extractPdfWithPdfjs(buffer: Buffer): Promise<string> {
-  // Dynamic import — keeps this server-only and avoids bundling issues
   const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs" as string);
 
-  // Point to the bundled worker file via an absolute file:// URL.
-  // pdfjs-dist is in serverExternalPackages so the file is always present
-  // at /var/task/node_modules/pdfjs-dist/... on Vercel.
   const workerPath = join(
     process.cwd(),
     "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
@@ -48,7 +59,7 @@ async function extractPdfWithPdfjs(buffer: Buffer): Promise<string> {
 
 /**
  * Extracts raw text from a PDF or DOCX file buffer.
- * PDF  → pdfjs-dist (bundled worker, Vercel-safe)
+ * PDF  → pdfjs-dist -> pdf2json (with safeDecodeComponent) -> ASCII fallback
  * DOCX → mammoth
  */
 export async function extractTextFromBuffer(
@@ -58,7 +69,7 @@ export async function extractTextFromBuffer(
   const mime = mimeType.toLowerCase();
   const isPdf = mime === "application/pdf" || mime.includes("pdf");
 
-  // ── PDF ────────────────────────────────────────────────────────────────────
+  // ── PDF Extraction ──────────────────────────────────────────────────────────
   if (isPdf) {
     try {
       const text = await extractPdfWithPdfjs(buffer);
@@ -71,7 +82,7 @@ export async function extractTextFromBuffer(
       console.warn("[Extractor] pdfjs failed:", e1?.message);
     }
 
-    // Secondary fallback: pdf2json
+    // Secondary fallback: pdf2json with safeDecodeComponent
     try {
       const PDFParser = require("pdf2json"); // eslint-disable-line
       const text = await new Promise<string>((resolve, reject) => {
@@ -85,7 +96,9 @@ export async function extractTextFromBuffer(
           for (const page of pages) {
             for (const t of page?.Texts || []) {
               for (const r of t?.R || []) {
-                if (r?.T) tokens.push(decodeURIComponent(r.T));
+                if (r?.T) {
+                  tokens.push(safeDecodeComponent(r.T));
+                }
               }
             }
           }
@@ -110,7 +123,7 @@ export async function extractTextFromBuffer(
       .trim();
   }
 
-  // ── DOCX ───────────────────────────────────────────────────────────────────
+  // ── DOCX Extraction ─────────────────────────────────────────────────────────
   if (
     mime.includes("word") ||
     mime.includes("document") ||
