@@ -6,18 +6,10 @@ interface ParsedResume {
   experience: string[];
 }
 
-// ─── Default skills matching the exact user UI reference ─────────────────────
-const DEFAULT_SKILLS = [
-  "JavaScript", "TypeScript", "Java", "React.js", "Next.js",
-  "Tailwind CSS", "Framer Motion", "GSAP", "Node.js", "Express.js",
-  "PostgreSQL", "MongoDB", "Figma", "CorelDraw", "Illustrator",
-  "Git", "GitHub", "Vercel", "Linux", "Postman", "Blender", "UI/UX Design"
-];
-
 // ─── Master skill keyword list ───────────────────────────────────────────────
 const ALL_TECH_SKILLS = [
-  "JavaScript", "TypeScript", "Java", "Python", "C++", "C#", "Go", "Rust",
-  "PHP", "Ruby", "Swift", "Kotlin", "Dart", "Scala", "HTML", "CSS",
+  "JavaScript", "TypeScript", "Java", "Python", "C++", "C#", "C", "Go", "Rust",
+  "PHP", "Ruby", "Swift", "Kotlin", "Dart", "Scala", "R", "SQL", "HTML", "CSS",
   "React.js", "Next.js", "Vue.js", "Angular", "Svelte", "Tailwind CSS",
   "Bootstrap", "Sass", "SCSS", "Framer Motion", "GSAP", "Three.js",
   "Redux", "Zustand", "Webpack", "Vite", "Node.js", "Express.js",
@@ -26,44 +18,52 @@ const ALL_TECH_SKILLS = [
   "Supabase", "Docker", "Kubernetes", "AWS", "GCP", "Azure", "Vercel",
   "Netlify", "CI/CD", "Git", "GitHub", "Postman", "Jira", "Figma",
   "Blender", "CorelDraw", "Illustrator", "Photoshop", "UI/UX Design",
-  "REST API", "GraphQL", "WebSockets", "Socket.io", "Prisma", "Drizzle"
+  "REST API", "GraphQL", "WebSockets", "Socket.io", "Prisma", "Drizzle",
+  "Machine Learning", "Deep Learning", "Data Analysis", "Artificial Intelligence",
+  "OpenCV", "TensorFlow", "PyTorch", "Pandas", "NumPy", "Scikit-Learn"
 ];
 
 // ─── Degree prefixes / University keywords ──────────────────────────────────
 const DEGREE_PATTERNS = [
-  /b\.?\s*tech/i, /b\.?\s*e\b/i, /b\.?\s*sc/i, /b\.?\s*com/i, /bba/i,
-  /m\.?\s*tech/i, /m\.?\s*e\b/i, /m\.?\s*sc/i, /mba/i, /phd/i, /ph\.d/i,
-  /bachelor/i, /master/i, /diploma/i, /associate/i,
+  /b\.?\s*tech/i, /b\.?\s*e\b/i, /b\.?\s*sc/i, /b\.?\s*com/i, /bba/i, /bca/i,
+  /m\.?\s*tech/i, /m\.?\s*e\b/i, /m\.?\s*sc/i, /mba/i, /mca/i, /phd/i, /ph\.d/i,
+  /bachelor/i, /master/i, /diploma/i, /associate/i, /degree/i, /high school/i
 ];
-const UNI_KEYWORDS = /university|college|institute|school|iit|nit|bits|iiit|vit|lpu|du|mu|pu|assam down town/i;
+const UNI_KEYWORDS = /university|college|institute|school|academy|iit|nit|bits|iiit|vit|lpu|du|mu|pu/i;
 const YEAR_RANGE = /\b(19|20)\d{2}\s*[-–—]\s*((19|20)\d{2}|present|ongoing|current)\b/i;
 
 // ─── Job title keywords ──────────────────────────────────────────────────────
-const JOB_TITLE_PATTERNS = /\b(intern|engineer|developer|designer|manager|analyst|consultant|lead|architect|specialist|officer|director|vp|cto|ceo|founder|co-founder)\b/i;
+const JOB_TITLE_PATTERNS = /\b(intern|engineer|developer|designer|manager|analyst|consultant|lead|architect|specialist|officer|director|vp|cto|ceo|founder|co-founder|associate|trainee|freelancer)\b/i;
 
 /**
- * Attempts to extract a clean education line from raw resume lines.
+ * Attempts to extract clean education lines directly from raw resume text.
  */
 function parseEducationLines(rawLines: string[]): string[] {
   const results: string[] = [];
   const seen = new Set<string>();
+  let inEducationSection = false;
 
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i].trim();
-    if (!line || line.length < 5 || line.length > 200) continue;
+    if (!line) continue;
+
+    // Detect Education header section
+    if (/^education|academic|qualification/i.test(line)) {
+      inEducationSection = true;
+      continue;
+    }
+    if (inEducationSection && /^experience|work|projects|skills|summary|certifications/i.test(line)) {
+      inEducationSection = false;
+    }
 
     const hasDegree = DEGREE_PATTERNS.some((p) => p.test(line));
     const hasUni = UNI_KEYWORDS.test(line);
 
-    if (hasDegree || hasUni) {
+    if (hasDegree || hasUni || (inEducationSection && line.length >= 8 && line.length <= 150)) {
       let combined = line;
       if (i + 1 < rawLines.length && rawLines[i + 1].trim().length > 3) {
         const next = rawLines[i + 1].trim();
-        if (
-          YEAR_RANGE.test(next) ||
-          (UNI_KEYWORDS.test(next) && !hasDegree) ||
-          (hasDegree && !hasUni && UNI_KEYWORDS.test(next))
-        ) {
+        if (YEAR_RANGE.test(next) || (UNI_KEYWORDS.test(next) && !hasUni)) {
           combined = `${line} - ${next}`;
           i++;
         }
@@ -71,7 +71,7 @@ function parseEducationLines(rawLines: string[]): string[] {
 
       const clean = combined.replace(/\s{2,}/g, " ").replace(/\s*[|]\s*/g, " | ").trim();
       const key = clean.toLowerCase().slice(0, 40);
-      if (!seen.has(key)) {
+      if (!seen.has(key) && clean.length > 5) {
         seen.add(key);
         results.push(clean);
       }
@@ -82,20 +82,30 @@ function parseEducationLines(rawLines: string[]): string[] {
 }
 
 /**
- * Attempts to extract clean experience lines.
+ * Attempts to extract clean experience lines directly from raw resume text.
  */
 function parseExperienceLines(rawLines: string[]): string[] {
   const results: string[] = [];
   const seen = new Set<string>();
+  let inExpSection = false;
 
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i].trim();
-    if (!line || line.length < 5 || line.length > 160) continue;
+    if (!line) continue;
+
+    // Detect Experience header section
+    if (/^experience|work history|employment|projects|internships/i.test(line)) {
+      inExpSection = true;
+      continue;
+    }
+    if (inExpSection && /^education|skills|summary|certifications|languages/i.test(line)) {
+      inExpSection = false;
+    }
 
     const hasTitle = JOB_TITLE_PATTERNS.test(line);
     const hasYear = YEAR_RANGE.test(line);
 
-    if (hasTitle) {
+    if (hasTitle || (inExpSection && hasYear) || (inExpSection && line.length >= 8 && line.length <= 140)) {
       let combined = line;
       if (!hasYear && i + 1 < rawLines.length) {
         const next = rawLines[i + 1].trim();
@@ -106,9 +116,9 @@ function parseExperienceLines(rawLines: string[]): string[] {
       }
 
       const clean = combined.replace(/\s{2,}/g, " ").replace(/\s*[|]\s*/g, " | ").trim();
-      if (clean.length <= 120 && !clean.startsWith("•") && !clean.startsWith("-")) {
+      if (clean.length <= 140 && !clean.startsWith("•") && !clean.startsWith("-")) {
         const key = clean.toLowerCase().slice(0, 40);
-        if (!seen.has(key)) {
+        if (!seen.has(key) && clean.length > 5) {
           seen.add(key);
           results.push(clean);
         }
@@ -120,13 +130,13 @@ function parseExperienceLines(rawLines: string[]): string[] {
 }
 
 /**
- * Rule-based fallback resume parser — guaranteed never to fail or return empty arrays.
+ * Rule-based fallback resume parser — strictly extracts only actual data found in the resume.
  */
 function fallbackRuleBasedParser(resumeText: string): ParsedResume {
   const skillsSet = new Set<string>();
   const text = resumeText || "";
 
-  // Flexible regex skill matchers
+  // Exact skill matchers
   for (const skill of ALL_TECH_SKILLS) {
     const escaped = skill.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
     const regex = new RegExp(`\\b${escaped}\\b`, "i");
@@ -136,52 +146,31 @@ function fallbackRuleBasedParser(resumeText: string): ParsedResume {
   // Alias & shorthand matchers
   if (/\b(JS|JavaScript)\b/i.test(text)) skillsSet.add("JavaScript");
   if (/\b(TS|TypeScript)\b/i.test(text)) skillsSet.add("TypeScript");
-  if (/\b(Java)\b/i.test(text)) skillsSet.add("Java");
   if (/\b(React|ReactJS|React\.js)\b/i.test(text)) skillsSet.add("React.js");
   if (/\b(Next|NextJS|Next\.js)\b/i.test(text)) skillsSet.add("Next.js");
   if (/\b(Node|NodeJS|Node\.js)\b/i.test(text)) skillsSet.add("Node.js");
   if (/\b(Express|ExpressJS|Express\.js)\b/i.test(text)) skillsSet.add("Express.js");
   if (/\b(Tailwind|TailwindCSS)\b/i.test(text)) skillsSet.add("Tailwind CSS");
   if (/\b(UI\/UX|UX\/UI)\b/i.test(text)) skillsSet.add("UI/UX Design");
-  if (/\b(GSAP)\b/i.test(text)) skillsSet.add("GSAP");
-  if (/\b(Blender)\b/i.test(text)) skillsSet.add("Blender");
-  if (/\b(Postman)\b/i.test(text)) skillsSet.add("Postman");
-  if (/\b(CorelDraw|Corel Draw|Corel)\b/i.test(text)) skillsSet.add("CorelDraw");
-  if (/\b(Illustrator)\b/i.test(text)) skillsSet.add("Illustrator");
-  if (/\b(Framer Motion|Framer)\b/i.test(text)) skillsSet.add("Framer Motion");
   if (/\b(Postgres|PostgreSQL)\b/i.test(text)) skillsSet.add("PostgreSQL");
   if (/\b(Mongo|MongoDB)\b/i.test(text)) skillsSet.add("MongoDB");
   if (/\b(Figma)\b/i.test(text)) skillsSet.add("Figma");
   if (/\b(Git)\b/i.test(text)) skillsSet.add("Git");
   if (/\b(GitHub)\b/i.test(text)) skillsSet.add("GitHub");
-  if (/\b(Vercel)\b/i.test(text)) skillsSet.add("Vercel");
-  if (/\b(Linux)\b/i.test(text)) skillsSet.add("Linux");
 
-  let skills = Array.from(skillsSet);
-
-  // Guarantee non-empty skills list for candidate profile matching
-  if (skills.length === 0) {
-    skills = DEFAULT_SKILLS;
-  }
+  const skills = Array.from(skillsSet);
 
   const rawLines = text
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 4 && !/^[%<>{}\[\]\\]/.test(l));
 
-  let education = parseEducationLines(rawLines);
-  if (education.length === 0) {
-    education = ["B.Tech in Computer Science - Assam Down Town University (2024 – 2028)"];
-  }
-
-  let experience = parseExperienceLines(rawLines);
-  if (experience.length === 0) {
-    experience = ["UI/UX Design Intern - Reve Cult (Sep – Nov 2025)"];
-  }
+  const education = parseEducationLines(rawLines);
+  const experience = parseExperienceLines(rawLines);
 
   return {
-    skills: skills.slice(0, 25),
-    education: education.slice(0, 4),
+    skills: skills.slice(0, 30),
+    education: education.slice(0, 5),
     experience: experience.slice(0, 5),
   };
 }
@@ -195,19 +184,18 @@ export async function parseResumeWithGemini(
   const apiKey = process.env.GEMINI_API_KEY;
 
   const modelsToTry = [
-    "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
     "gemini-2.0-flash",
     "gemini-1.5-pro",
   ];
 
-  if (apiKey && resumeText && resumeText.trim().length > 50) {
+  if (apiKey && resumeText && resumeText.trim().length > 30) {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
 
       for (const modelName of modelsToTry) {
         try {
-          console.log(`[Gemini] Trying model: ${modelName}`);
+          console.log(`[Gemini] Attempting extraction with model: ${modelName}`);
 
           const model = genAI.getGenerativeModel({
             model: modelName,
@@ -215,24 +203,25 @@ export async function parseResumeWithGemini(
           });
 
           const prompt = `
-You are an expert ATS (Applicant Tracking System) resume parser.
-Extract structured information from the resume text below.
+You are an accurate Applicant Tracking System (ATS) resume parser.
+Extract ONLY true information explicitly present in the candidate's resume text below.
 
-Respond ONLY with a valid JSON object:
+STRICT INSTRUCTIONS:
+- Do NOT invent, mock, or assume any fake universities, companies, degrees, or skills.
+- Extract ONLY the actual skills, programming languages, software tools, frameworks, and design skills explicitly written in the resume text.
+- Format education entries as "Degree/Major - Institution (Dates)" using only the text from the resume.
+- Format experience entries as "Job Title - Company/Project (Dates)" using only the text from the resume.
+- If a section (skills, education, or experience) has no entries in the resume, return an empty array [] for that section.
+
+Respond strictly with valid JSON:
 {
-  "skills": ["Skill1", "Skill2", ...],
-  "education": ["Degree in Major - Institution Name (Start Year – End Year)"],
-  "experience": ["Job Title - Company Name (Month Year – Month Year)"]
+  "skills": ["ExactSkill1", "ExactSkill2"],
+  "education": ["Exact Education Details"],
+  "experience": ["Exact Experience Details"]
 }
 
-Rules:
-- Extract ALL technical skills, tools, programming languages, frameworks, and design skills.
-- Format education entries as "Degree in Major - Institution (Start – End)" e.g. "B.Tech in Computer Science - Assam Down Town University (2024 – 2028)".
-- Format experience entries as "Title - Company (Dates)" e.g. "UI/UX Design Intern - Reve Cult (Sep – Nov 2025)".
-- Return ONLY the JSON. No markdown, no explanation.
-
-Resume text:
-${resumeText.slice(0, 8000)}
+Resume Text:
+${resumeText.slice(0, 10000)}
           `;
 
           const result = await model.generateContent(prompt);
@@ -259,24 +248,24 @@ ${resumeText.slice(0, 8000)}
             : [];
 
           console.log(
-            `[Gemini] Parsed: ${skills.length} skills, ${education.length} edu, ${experience.length} exp`
+            `[Gemini Success] Extracted ${skills.length} skills, ${education.length} edu, ${experience.length} exp`
           );
 
           return {
-            skills: skills.length > 0 ? skills : DEFAULT_SKILLS,
-            education: education.length > 0 ? education : ["B.Tech in Computer Science - Assam Down Town University (2024 – 2028)"],
-            experience: experience.length > 0 ? experience : ["UI/UX Design Intern - Reve Cult (Sep – Nov 2025)"],
+            skills,
+            education,
+            experience,
           };
         } catch (err: any) {
-          console.warn(`[Gemini] Model ${modelName} failed: ${err?.message}`);
+          console.warn(`[Gemini] Model ${modelName} error: ${err?.message}`);
         }
       }
     } catch (err: any) {
-      console.warn("[Gemini] SDK init failed:", err?.message);
+      console.warn("[Gemini] SDK error:", err?.message);
     }
   }
 
-  // Fallback: rule-based parser
-  console.log("[Gemini] Using rule-based fallback parser.");
+  // Fallback: strict rule-based parser
+  console.log("[Resume Parser] Using rule-based text extractor.");
   return fallbackRuleBasedParser(resumeText);
 }

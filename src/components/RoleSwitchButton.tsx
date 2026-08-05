@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { switchUserRoleAction } from "@/app/actions/user";
 import { Loader2, Repeat } from "lucide-react";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 
 export default function RoleSwitchButton({
   currentRole,
@@ -12,7 +12,7 @@ export default function RoleSwitchButton({
   currentRole: "CANDIDATE" | "EMPLOYER";
 }) {
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const { update } = useSession();
 
   const targetRole = currentRole === "EMPLOYER" ? "CANDIDATE" : "EMPLOYER";
   const targetLabel = currentRole === "EMPLOYER" ? "Switch to Candidate Mode" : "Switch to Recruiter Mode";
@@ -23,8 +23,10 @@ export default function RoleSwitchButton({
       const res = await switchUserRoleAction(targetRole);
       if (res.success && res.redirectUrl) {
         toast.success(`Switched to ${targetRole === "EMPLOYER" ? "Recruiter" : "Candidate"} Mode!`);
-        router.push(res.redirectUrl);
-        router.refresh();
+        // Signal NextAuth session client update
+        await update({ role: targetRole });
+        // Full browser navigation to force fresh server session load
+        window.location.href = res.redirectUrl;
       } else {
         toast.error(res.error || "Failed to switch role.");
         setLoading(false);
