@@ -50,6 +50,17 @@ export default function ProfilePanel({ initialProfile }: ProfilePanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerMouse, setContainerMouse] = useState({ x: 0, y: 0, active: false });
 
+  // ✅ Re-sync state when server delivers fresh data after router.refresh()
+  // useState(initialProfile) only runs once on mount — this effect catches updates.
+  useEffect(() => {
+    if (initialProfile) {
+      setProfile(initialProfile);
+      setEditSkills(initialProfile.skills.join(", "));
+      setEditEducation(initialProfile.education.join("\n"));
+      setEditExperience(initialProfile.experience.join("\n"));
+    }
+  }, [initialProfile]);
+
   const handleMouseMove = (e: React.MouseEvent) => {
     setContainerMouse({
       x: e.clientX,
