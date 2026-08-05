@@ -76,7 +76,7 @@ export async function sendApplicationStatusEmail({
 }
 
 /**
- * Sends a passwordless Magic Link sign-in email using Resend.
+ * Sends a passwordless Magic Link sign-in email matching exact reference design.
  */
 export async function sendMagicLinkEmail({
   to,
@@ -87,8 +87,7 @@ export async function sendMagicLinkEmail({
   magicLinkUrl: string;
   userName?: string;
 }) {
-  const recipientName = userName || to.split("@")[0];
-  const subject = `Your Fitboard Magic Link Sign-In`;
+  const subject = `Your magic link to sign in to Fitboard`;
 
   const htmlBody = `
     <!DOCTYPE html>
@@ -96,35 +95,39 @@ export async function sendMagicLinkEmail({
       <head>
         <meta charset="utf-8">
         <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0c10; color: #ffffff; padding: 40px 20px; }
-          .card { max-width: 480px; margin: 0 auto; background: #12141c; border: 1px solid #222634; border-radius: 20px; padding: 32px; text-align: center; }
-          .badge { display: inline-block; font-size: 10px; font-family: monospace; letter-spacing: 2px; text-transform: uppercase; background: #1a1e2e; color: #a0aec0; padding: 4px 12px; border-radius: 12px; margin-bottom: 16px; }
-          h1 { font-size: 24px; font-weight: normal; margin: 0 0 8px 0; color: #ffffff; }
-          p { font-size: 14px; color: #a0aec0; line-height: 1.6; margin-bottom: 28px; }
-          .btn { display: inline-block; background-color: #c5f82a; color: #000000; font-size: 14px; font-weight: bold; text-decoration: none; padding: 14px 32px; border-radius: 12px; transition: all 0.2s; }
-          .footer { margin-top: 32px; font-size: 11px; color: #4a5568; font-family: monospace; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; color: #000000; padding: 40px 20px; margin: 0; }
+          .container { max-width: 560px; margin: 0 auto; background: #ffffff; text-align: left; }
+          .brand { font-size: 16px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; color: #000000; margin-bottom: 40px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+          h1 { font-size: 32px; font-weight: 800; margin: 0 0 16px 0; color: #000000; letter-spacing: -0.5px; }
+          p { font-size: 15px; color: #333333; line-height: 1.6; margin-bottom: 28px; }
+          .email-link { color: #0066cc; text-decoration: underline; }
+          .btn { display: inline-block; background-color: #000000; color: #ffffff !important; font-size: 14px; font-weight: 700; text-decoration: none; padding: 14px 28px; border-radius: 8px; margin-bottom: 32px; }
+          .subtext { font-size: 12px; color: #666666; margin-top: 16px; margin-bottom: 8px; }
+          .raw-link { font-size: 12px; color: #0066cc; word-break: break-all; text-decoration: underline; }
         </style>
       </head>
       <body>
-        <div class="card">
-          <div class="badge">FITBOARD MAGIC LINK</div>
-          <h1>Welcome, ${recipientName}</h1>
-          <p>Click the button below to sign in to your Fitboard account instantly. No password required!</p>
-          <a href="${magicLinkUrl}" class="btn">✨ Sign In to Fitboard →</a>
-          <p style="margin-top: 24px; font-size: 11px; color: #718096;">
-            If the button doesn't work, copy and paste this link into your browser:<br>
-            <span style="color: #c5f82a; word-break: break-all;">${magicLinkUrl}</span>
+        <div class="container">
+          <div class="brand">FITBOARD</div>
+          
+          <h1>Sign in to Fitboard</h1>
+          
+          <p>
+            Hi <a href="mailto:${to}" class="email-link">${to}</a>, use the button below to sign in to your account. No password needed — this link expires in <strong>10 minutes</strong>.
           </p>
-          <div class="footer">
-            This magic link expires in 15 minutes.<br>
-            If you didn't request this email, you can safely ignore it.
+
+          <div>
+            <a href="${magicLinkUrl}" class="btn">Sign in to Fitboard →</a>
           </div>
+
+          <p class="subtext">Or copy and paste this link into your browser:</p>
+          <a href="${magicLinkUrl}" class="raw-link">${magicLinkUrl}</a>
         </div>
       </body>
     </html>
   `;
 
-  const textBody = `Hi ${recipientName},\n\nClick the link below to sign in to your Fitboard account:\n\n${magicLinkUrl}\n\nThis link is valid for 15 minutes.\n\nBest regards,\nFitboard Team`;
+  const textBody = `Sign in to Fitboard\n\nHi ${to}, use the link below to sign in to your account. No password needed — this link expires in 10 minutes:\n\n${magicLinkUrl}\n\nFitboard Team`;
 
   console.log(`[MagicLink Email] Sending magic link to: ${to}`);
 
@@ -149,7 +152,7 @@ export async function sendMagicLinkEmail({
       return {
         success: false,
         error: response.error.message || "Resend API returned an error.",
-        magicLinkUrl, // return link so user can still test in dev/demo!
+        magicLinkUrl,
       };
     }
 

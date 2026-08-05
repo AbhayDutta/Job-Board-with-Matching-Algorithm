@@ -1,158 +1,87 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import GoogleProvider from "next-auth/providers/google";
-import GitHubProvider from "next-auth/providers/github";
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { verifyMagicToken } from "@/lib/magic-token";
 
 const AUTH_SECRET = process.env.NEXTAUTH_SECRET || "fitboard-auth-secret-keys-neon-postgress-3453";
 
-const providers: any[] = [
-  CredentialsProvider({
-    name: "Credentials",
-    credentials: {
-      email: { label: "Email", type: "email" },
-      password: { label: "Password", type: "password" },
-      magicToken: { label: "Magic Token", type: "text" },
-    },
-    async authorize(credentials) {
-      // ── 1. Passwordless Magic Link Authentication ──────────────────────────
-      if (credentials?.magicToken) {
-        const payload = verifyMagicToken(credentials.magicToken);
-        if (!payload) {
-          console.warn("[Auth] Magic Token verification failed or token expired.");
-          return null;
-        }
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+        magicToken: { label: "Magic Token", type: "text" },
+      },
+      async authorize(credentials) {
+        // ── 1. Passwordless Magic Link Authentication ──────────────────────────
+        if (credentials?.magicToken) {
+          const payload = verifyMagicToken(credentials.magicToken);
+          if (!payload) {
+            console.warn("[Auth] Magic Token verification failed or token expired.");
+            return null;
+          }
 
-        const lowerEmail = payload.email.toLowerCase().trim();
+          const lowerEmail = payload.email.toLowerCase().trim();
 
-        let user = await db.user.findFirst({
-          where: {
-            OR: [
-              { email: lowerEmail },
-              { email: { equals: lowerEmail, mode: "insensitive" } },
-            ],
-          },
-        });
-
-        if (!user) {
-          const userName = payload.name || lowerEmail.split("@")[0];
-          const userRole = payload.role || "CANDIDATE";
-
-          user = await db.user.create({
-            data: {
-              email: lowerEmail,
-              name: userName,
-              password: "MAGIC_LINK_USER",
-              role: userRole,
-              ...(userRole === "CANDIDATE"
-                ? {
-                    candidateProfile: {
-                      create: {
-                        name: userName,
-                        skills: [],
-                        experience: [],
-                        education: [],
-                      },
-                    },
-                  }
-                : {}),
+          let user = await db.user.findFirst({
+            where: {
+              OR: [
+                { email: lowerEmail },
+                { email: { equals: lowerEmail, mode: "insensitive" } },
+              ],
             },
           });
-          console.log(`[Auth MagicLink] Auto-created new ${userRole} user: ${user.id} (${lowerEmail})`);
-        } else {
-          console.log(`[Auth MagicLink] Authenticated existing user: ${user.id} (${lowerEmail})`);
+
+          if (!user) {
+            const userName = payload.name || lowerEmail.split("@")[0];
+            const userRole = payload.role || "CANDIDATE";
+
+            user = await db.user.create({
+              data: {
+                email: lowerEmail,
+                name: userName,
+                password: "MAGIC_LINK_USER",
+                role: userRole,
+                ...(userRole === "CANDIDATE"
+                  ? {
+                      candidateProfile: {
+                        create: {
+                          name: userName,
+                          skills: [],
+                          experience: [],
+                          education: [],
+                        },
+                      },
+                    }
+                  : {}),
+              },
+            });
+            console.log(`[Auth MagicLink] Auto-created new ${userRole} user: ${user.id} (${lowerEmail})`);
+          } else {
+            console.log(`[Auth MagicLink] Authenticated existing user: ${user.id} (${lowerEmail})`);
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            name: user.name,
+          };
         }
 
-        return {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          name: user.name,
-        };
-      }
-
-      // ── 2. Standard Password Credentials Authentication ─────────────────────
-      if (!credentials?.email || !credentials?.password) {
-        return null;
-      }
-
-      try {
-        const rawEmail = credentials.email.trim();
-        const lowerEmail = rawEmail.toLowerCase();
-
-        const user = await db.user.findFirst({
-          where: {
-            OR: [
-              { email: rawEmail },
-              { email: lowerEmail },
-              { email: { equals: lowerEmail, mode: "insensitive" } },
-            ],
-          },
-        });
-
-        if (!user || !user.password) {
-          console.warn("[Auth] Credentials login failed: user not found or no password hash for", lowerEmail);
+        // ── 2. Standard Password Credentials Authentication ─────────────────────
+        if (!credentials?.email || !credentials?.password) {
           return null;
         }
 
-        const isPasswordCorrect = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-
-        if (!isPasswordCorrect) {
-          console.warn("[Auth] Credentials login failed: invalid password for", lowerEmail);
-          return null;
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          name: user.name,
-        };
-      } catch (err) {
-        console.error("[Auth] Authorize exception error:", err);
-        return null;
-      }
-    },
-  }),
-];
-
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  providers.push(
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    })
-  );
-}
-
-if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
-  providers.push(
-    GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    })
-  );
-}
-
-export const authOptions: NextAuthOptions = {
-  providers,
-  callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider === "google" || account?.provider === "github") {
-        if (!user.email) {
-          console.error("[Auth OAuth] No email returned by provider", account.provider);
-          return false;
-        }
         try {
-          const rawEmail = user.email.trim();
+          const rawEmail = credentials.email.trim();
           const lowerEmail = rawEmail.toLowerCase();
 
-          const existingUser = await db.user.findFirst({
+          const user = await db.user.findFirst({
             where: {
               OR: [
                 { email: rawEmail },
@@ -162,32 +91,35 @@ export const authOptions: NextAuthOptions = {
             },
           });
 
-          if (!existingUser) {
-            const userName = user.name || rawEmail.split("@")[0];
-            const newUser = await db.user.create({
-              data: {
-                email: lowerEmail,
-                name: userName,
-                password: "OAUTH_EXTERNAL_USER",
-                role: "CANDIDATE",
-                candidateProfile: {
-                  create: {
-                    name: userName,
-                    skills: [],
-                    experience: [],
-                    education: [],
-                  },
-                },
-              },
-            });
-            console.log(`[Auth OAuth] Created new candidate user ${newUser.id} via ${account.provider} (${lowerEmail})`);
+          if (!user || !user.password) {
+            console.warn("[Auth] Credentials login failed: user not found or no password hash for", lowerEmail);
+            return null;
           }
+
+          const isPasswordCorrect = await bcrypt.compare(
+            credentials.password,
+            user.password
+          );
+
+          if (!isPasswordCorrect) {
+            console.warn("[Auth] Credentials login failed: invalid password for", lowerEmail);
+            return null;
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            name: user.name,
+          };
         } catch (err) {
-          console.error("[Auth OAuth] Auto-registration error:", err);
+          console.error("[Auth] Authorize exception error:", err);
+          return null;
         }
-      }
-      return true;
-    },
+      },
+    }),
+  ],
+  callbacks: {
     async jwt({ token, user }) {
       if (user && user.email) {
         try {
