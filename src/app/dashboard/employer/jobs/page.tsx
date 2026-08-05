@@ -12,6 +12,7 @@ import UserProfileModal from "@/components/UserProfileModal";
 import CommandPalette from "@/components/CommandPalette";
 import EmployerAnalytics from "@/components/EmployerAnalytics";
 import { SignOutButton } from "@/components/SignOutButton";
+import RoleSwitchButton from "@/components/RoleSwitchButton";
 import { db } from "@/lib/db";
 
 export default async function EmployerJobsPage() {
@@ -102,6 +103,7 @@ export default async function EmployerJobsPage() {
             </Link>
           </nav>
           <div className="flex items-center gap-3">
+            <RoleSwitchButton currentRole="EMPLOYER" />
             <CommandPalette />
             <ThemeToggle />
             {userRecord && <UserProfileModal user={userRecord} />}

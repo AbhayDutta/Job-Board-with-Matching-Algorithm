@@ -21,6 +21,7 @@ import {
 import ThemeToggle from "@/components/ThemeToggle";
 import UserProfileModal from "@/components/UserProfileModal";
 import { SignOutButton } from "@/components/SignOutButton";
+import RoleSwitchButton from "@/components/RoleSwitchButton";
 
 export default async function CandidateJobsPage() {
   const session = await getSession(authOptions);
@@ -142,6 +143,7 @@ export default async function CandidateJobsPage() {
             </Link>
           </nav>
           <div className="flex items-center gap-3">
+            <RoleSwitchButton currentRole="CANDIDATE" />
             <ThemeToggle />
             {userRecord && <UserProfileModal user={userRecord} />}
             <SignOutButton />

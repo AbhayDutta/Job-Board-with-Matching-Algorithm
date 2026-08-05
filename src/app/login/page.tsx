@@ -17,6 +17,7 @@ function LoginContent() {
   const urlError = searchParams.get("error");
 
   const [mode, setMode] = useState<"magic" | "password">("magic");
+  const [role, setRole] = useState<"CANDIDATE" | "EMPLOYER">("CANDIDATE");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(
@@ -90,7 +91,7 @@ function LoginContent() {
     setLoading(true);
 
     try {
-      const res = await sendMagicLinkAction({ email });
+      const res = await sendMagicLinkAction({ email, role });
       if (res.success) {
         setMagicSent(true);
         if (res.magicLinkUrl) setMagicUrl(res.magicLinkUrl);
@@ -154,7 +155,7 @@ function LoginContent() {
             <p>Authenticating your magic link...</p>
           </motion.div>
         ) : magicSent ? (
-          /* ── Confirmation Screen matching exact reference screenshot ── */
+          /* ── Confirmation Screen ── */
           <motion.div
             key="magicSentScreen"
             initial={shouldReduceMotion ? {} : { opacity: 0, scale: 0.96 }}
@@ -162,22 +163,18 @@ function LoginContent() {
             transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
             className="mx-auto max-w-md w-full p-8 text-center"
           >
-            {/* Green Circular Mail Badge */}
             <div className="mx-auto h-16 w-16 rounded-full bg-[#0d2818] border border-[#1b432c] grid place-items-center mb-6 shadow-lg shadow-emerald-950/30">
               <MailCheck className="h-7 w-7 text-emerald-400" />
             </div>
 
-            {/* Title */}
             <h1 className="text-3xl sm:text-4xl font-sans font-bold text-foreground tracking-tight mb-4">
               Check your email
             </h1>
 
-            {/* Subtitle with bold recipient email */}
             <p className="text-sm font-sans text-muted-foreground leading-relaxed max-w-sm mx-auto mb-8">
-              We sent a magic link to <strong className="text-foreground font-semibold">{email}</strong>. Click it to sign in instantly.
+              We sent a magic link to <strong className="text-foreground font-semibold">{email}</strong>. Click it to sign in as <span className="text-accent font-bold font-mono">{role === "EMPLOYER" ? "Recruiter" : "Candidate"}</span> instantly.
             </p>
 
-            {/* Demo Mode direct link fallback if present */}
             {magicUrl && (
               <div className="pt-2 max-w-xs mx-auto space-y-3">
                 <a
@@ -191,7 +188,7 @@ function LoginContent() {
                   onClick={() => setMagicSent(false)}
                   className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors underline cursor-pointer"
                 >
-                  Use a different email
+                  Use a different email or role
                 </button>
               </div>
             )}
@@ -215,9 +212,7 @@ function LoginContent() {
                 Welcome back
               </h1>
               <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-                {mode === "magic"
-                  ? "Enter your email to sign in instantly with a magic link."
-                  : "Sign in with your email and password credentials."}
+                Choose your role and enter your email to sign in.
               </p>
             </div>
 
@@ -237,6 +232,32 @@ function LoginContent() {
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Role Switcher */}
+              <div className="p-1 rounded-xl bg-secondary/60 border border-border/80 grid grid-cols-2 gap-1 text-[11px] font-mono mb-1">
+                <button
+                  type="button"
+                  onClick={() => setRole("CANDIDATE")}
+                  className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                    role === "CANDIDATE"
+                      ? "bg-background text-foreground border border-border/60 font-bold shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Candidate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole("EMPLOYER")}
+                  className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                    role === "EMPLOYER"
+                      ? "bg-background text-foreground border border-border/60 font-bold shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Recruiter
+                </button>
+              </div>
 
               {/* Mode Selector Toggle */}
               <div className="p-1 rounded-xl bg-secondary/60 border border-border/80 grid grid-cols-2 gap-1 text-[11px] font-mono mb-2">
@@ -295,7 +316,7 @@ function LoginContent() {
                         <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending link...
                       </span>
                     ) : (
-                      "Send magic link"
+                      `Send magic link (${role === "EMPLOYER" ? "Recruiter" : "Candidate"})`
                     )}
                   </button>
 

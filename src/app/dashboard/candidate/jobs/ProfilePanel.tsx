@@ -31,6 +31,7 @@ import { toast } from "sonner";
 import { BubbleTag, getSkillData, SkillSoundManager } from "@/components/BubbleTag";
 
 import ResumeDropzone from "@/components/ResumeDropzone";
+import RoleSwitchButton from "@/components/RoleSwitchButton";
 
 interface ProfilePanelProps {
   initialProfile: {
@@ -228,18 +229,21 @@ export default function ProfilePanel({ initialProfile }: ProfilePanelProps) {
     <div className="space-y-6">
       {/* Profile details card */}
       <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-match-glow space-y-5">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-foreground">
-            <User className="h-5.5 w-5.5" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 truncate">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-foreground">
+              <User className="h-5.5 w-5.5" />
+            </div>
+            <div className="truncate">
+              <h2 className="font-serif text-xl font-normal text-foreground">
+                {profile?.name || "Candidate Profile"}
+              </h2>
+              <p className="text-[10px] text-muted-foreground font-mono truncate">
+                {profile?.resumeUrl ? `Resume: ${profile.resumeUrl.substring(37)}` : "No resume synced"}
+              </p>
+            </div>
           </div>
-          <div className="truncate">
-            <h2 className="font-serif text-xl font-normal text-foreground">
-              {profile?.name || "Candidate Profile"}
-            </h2>
-            <p className="text-[10px] text-muted-foreground font-mono truncate">
-              {profile?.resumeUrl ? `Resume: ${profile.resumeUrl.substring(37)}` : "No resume synced"}
-            </p>
-          </div>
+          <RoleSwitchButton currentRole="CANDIDATE" />
         </div>
 
         {/* Skill vector tags list */}

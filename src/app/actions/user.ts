@@ -44,3 +44,62 @@ export async function updateUserProfile({
     return { success: false, error: "Failed to update profile avatar." };
   }
 }
+
+/**
+ * Allows a single user (same email address) to seamlessly switch between Candidate and Recruiter roles.
+ */
+export async function switchUserRoleAction(targetRole: "CANDIDATE" | "EMPLOYER") {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user?.id) {
+      return { success: false, error: "Unauthorized. Please sign in first." };
+    }
+
+    const userId = session.user.id;
+
+    // Ensure CandidateProfile exists if switching to Candidate
+    if (targetRole === "CANDIDATE") {
+      const existingProfile = await db.candidateProfile.findUnique({
+        where: { userId },
+      });
+
+      if (!existingProfile) {
+        await db.candidateProfile.create({
+          data: {
+            userId,
+            name: (session.user as any).name || session.user.email?.split("@")[0] || "Candidate",
+            skills: [],
+            experience: [],
+            education: [],
+          },
+        });
+      }
+    }
+
+    // Update user role in database
+    const updatedUser = await db.user.update({
+      where: { id: userId },
+      data: { role: targetRole },
+    });
+
+    console.log(`[Role Switcher] User ${userId} switched role to ${targetRole}`);
+
+    revalidatePath("/dashboard/candidate/jobs");
+    revalidatePath("/dashboard/employer/jobs");
+
+    const redirectUrl =
+      targetRole === "EMPLOYER"
+        ? "/dashboard/employer/jobs"
+        : "/dashboard/candidate/jobs";
+
+    return {
+      success: true,
+      role: updatedUser.role,
+      redirectUrl,
+    };
+  } catch (error: any) {
+    console.error("[Role Switcher Error]:", error);
+    return { success: false, error: error?.message || "Failed to switch role." };
+  }
+}

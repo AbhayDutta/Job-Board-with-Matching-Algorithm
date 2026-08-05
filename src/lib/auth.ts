@@ -25,6 +25,7 @@ export const authOptions: NextAuthOptions = {
           }
 
           const lowerEmail = payload.email.toLowerCase().trim();
+          const selectedRole = payload.role || "CANDIDATE";
 
           let user = await db.user.findFirst({
             where: {
@@ -37,31 +38,48 @@ export const authOptions: NextAuthOptions = {
 
           if (!user) {
             const userName = payload.name || lowerEmail.split("@")[0];
-            const userRole = payload.role || "CANDIDATE";
 
             user = await db.user.create({
               data: {
                 email: lowerEmail,
                 name: userName,
                 password: "MAGIC_LINK_USER",
-                role: userRole,
-                ...(userRole === "CANDIDATE"
-                  ? {
-                      candidateProfile: {
-                        create: {
-                          name: userName,
-                          skills: [],
-                          experience: [],
-                          education: [],
-                        },
-                      },
-                    }
-                  : {}),
+                role: selectedRole,
+                candidateProfile: {
+                  create: {
+                    name: userName,
+                    skills: [],
+                    experience: [],
+                    education: [],
+                  },
+                },
               },
             });
-            console.log(`[Auth MagicLink] Auto-created new ${userRole} user: ${user.id} (${lowerEmail})`);
+            console.log(`[Auth MagicLink] Auto-created new ${selectedRole} user: ${user.id} (${lowerEmail})`);
           } else {
-            console.log(`[Auth MagicLink] Authenticated existing user: ${user.id} (${lowerEmail})`);
+            // Dual-Role Support: Update user role to whichever role they picked for this session
+            user = await db.user.update({
+              where: { id: user.id },
+              data: { role: selectedRole },
+            });
+
+            // Ensure CandidateProfile exists for dual-role users
+            const existingProfile = await db.candidateProfile.findUnique({
+              where: { userId: user.id },
+            });
+            if (!existingProfile) {
+              await db.candidateProfile.create({
+                data: {
+                  userId: user.id,
+                  name: user.name || lowerEmail.split("@")[0],
+                  skills: [],
+                  experience: [],
+                  education: [],
+                },
+              });
+            }
+
+            console.log(`[Auth MagicLink] Authenticated existing user ${user.id} (${lowerEmail}) as ${selectedRole}`);
           }
 
           return {
