@@ -15,7 +15,8 @@ import {
   Sparkles,
   Zap,
   Star,
-  Loader2
+  Loader2,
+  MousePointerClick
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence, useReducedMotion, useInView } from "framer-motion";
@@ -329,9 +330,12 @@ function MatchCard() {
       <div className="rounded-2xl border border-border bg-card p-7 shadow-match-glow transition-all duration-300 hover:shadow-match-glow-hover hover:scale-[1.01]">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground flex-wrap">
               <Sparkles className="h-3.5 w-3.5 text-[oklch(0.72_0.18_35)]" />
               Live Match Report
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-accent/20 border border-accent/40 text-[10px] font-mono font-bold text-accent animate-pulse shadow-xs">
+                <MousePointerClick className="h-3 w-3" /> CLICK SKILLS TO TOGGLE SCORE
+              </span>
             </div>
             <div className="mt-1 font-serif text-2xl font-normal text-foreground">
               Priya S. → Senior Backend Eng.
@@ -373,8 +377,13 @@ function MatchCard() {
                       {s.name}
                     </span>
                   </div>
-                  <div className={`tabular-nums font-mono text-xs transition-colors duration-300 ${active ? "text-muted-foreground font-bold" : "text-muted-foreground/30"}`}>
-                    {active ? `${s.score}%` : "0%"}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-accent opacity-0 group-hover/row:opacity-100 transition-opacity duration-200 hidden sm:inline-flex items-center gap-1 font-semibold">
+                      <MousePointerClick className="h-3 w-3" /> {active ? "click to disable" : "click to enable"}
+                    </span>
+                    <div className={`tabular-nums font-mono text-xs transition-colors duration-300 ${active ? "text-muted-foreground font-bold" : "text-muted-foreground/30"}`}>
+                      {active ? `${s.score}%` : "0%"}
+                    </div>
                   </div>
                 </div>
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
@@ -390,12 +399,12 @@ function MatchCard() {
           })}
         </div>
 
-        <div className="mt-6 flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground font-mono">
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.88_0.22_130)]" />
-            cosine similarity
+        <div className="mt-6 flex flex-wrap items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground font-mono gap-2">
+          <span className="flex items-center gap-1.5 text-foreground font-semibold">
+            <MousePointerClick className="h-3.5 w-3.5 text-accent animate-bounce" />
+            Interactive Demo: Click any skill above to update match score
           </span>
-          <span>v_c · v_j / ‖v_c‖‖v_j‖</span>
+          <span className="text-[11px] opacity-70">v_c · v_j / ‖v_c‖‖v_j‖</span>
         </div>
       </div>
     </div>
