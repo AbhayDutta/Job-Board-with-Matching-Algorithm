@@ -4,8 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { sendMagicLinkAction } from "@/app/actions/magic-link";
-import { AlertCircle, Loader2, Sparkles, Mail, KeyRound, MailCheck } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 import Navbar from "@/components/Navbar";
@@ -48,67 +47,20 @@ function GithubIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function LoginContent() {
   const searchParams = useSearchParams();
-  const magicToken = searchParams.get("magicToken");
   const urlError = searchParams.get("error");
 
-  const [mode, setMode] = useState<"password" | "magic">("password");
   const [role, setRole] = useState<"CANDIDATE" | "EMPLOYER">("CANDIDATE");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(
-    urlError ? "Authentication failed or session expired." : null
+    urlError ? "Authentication failed. Please check your details." : null
   );
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
-  const [magicSent, setMagicSent] = useState(false);
-  const [autoAuthenticating, setAutoAuthenticating] = useState(!!magicToken);
 
   const router = useRouter();
   const { data: session, status } = useSession();
   const shouldReduceMotion = useReducedMotion();
-
-  // Auto-authenticate when coming from Magic Link click (?magicToken=XYZ)
-  useEffect(() => {
-    if (magicToken) {
-      const handleMagicAuth = async () => {
-        setAutoAuthenticating(true);
-        setError(null);
-        try {
-          let targetRole = "CANDIDATE";
-          try {
-            const rawPayload = magicToken.split(".")[0];
-            const parsed = JSON.parse(atob(rawPayload));
-            if (parsed.role === "EMPLOYER") targetRole = "EMPLOYER";
-          } catch (e) {
-            console.error("Token payload decode error", e);
-          }
-
-          const targetUrl =
-            targetRole === "EMPLOYER"
-              ? "/dashboard/employer/jobs"
-              : "/dashboard/candidate/jobs";
-
-          const res = await signIn("credentials", {
-            magicToken,
-            redirect: false,
-          });
-
-          if (res?.error) {
-            setError("Magic link verification failed or expired.");
-            setAutoAuthenticating(false);
-          } else {
-            window.location.href = targetUrl;
-          }
-        } catch (err) {
-          console.error(err);
-          setError("Failed to authenticate magic link.");
-          setAutoAuthenticating(false);
-        }
-      };
-
-      handleMagicAuth();
-    }
-  }, [magicToken]);
 
   // Auto redirect logged in users directly to dashboard
   useEffect(() => {
@@ -159,32 +111,6 @@ function LoginContent() {
     }
   };
 
-  const handleMagicSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!email || !email.includes("@")) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const res = await sendMagicLinkAction({ email, role });
-      if (res.success) {
-        setMagicSent(true);
-      } else {
-        setError(res.error || "Failed to send magic link.");
-      }
-    } catch (err) {
-      console.error(err);
-      setError("An unexpected error occurred.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleOAuthSignIn = async (provider: "google" | "github") => {
     setError(null);
     setOauthLoading(provider);
@@ -203,261 +129,158 @@ function LoginContent() {
       {/* Soft Ambient Glow Backdrop */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 h-80 w-80 rounded-full bg-[oklch(0.87_0.22_130/0.18)] dark:bg-[oklch(0.87_0.22_130/0.12)] blur-[80px] animate-breathe pointer-events-none" />
 
-      <AnimatePresence mode="wait">
-        {autoAuthenticating ? (
-          <motion.div
-            key="autoAuth"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="my-8 py-6 text-center space-y-3 font-mono text-xs text-muted-foreground"
-          >
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-foreground" />
-            <p>Authenticating session...</p>
-          </motion.div>
-        ) : magicSent ? (
-          /* ── Confirmation Screen ── */
-          <motion.div
-            key="magicSentScreen"
-            initial={shouldReduceMotion ? {} : { opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-            className="mx-auto max-w-md w-full p-8 text-center"
-          >
-            <div className="mx-auto h-16 w-16 rounded-full bg-[#0d2818] border border-[#1b432c] grid place-items-center mb-6 shadow-lg shadow-emerald-950/30">
-              <MailCheck className="h-7 w-7 text-emerald-400" />
-            </div>
+      <motion.div
+        key="loginCard"
+        initial={shouldReduceMotion ? {} : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}
+        className="mx-auto max-w-sm w-full p-8 text-center bg-card/90 backdrop-blur-xl border border-border/80 rounded-3xl shadow-2xl ring-1 ring-accent/20 hover:ring-accent/40 transition-all duration-300"
+      >
+        {/* Title */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight mb-2">
+            Welcome back
+          </h1>
+          <p className="text-xs font-mono text-muted-foreground leading-relaxed">
+            Sign in to your Fitboard account to continue.
+          </p>
+        </div>
 
-            <h1 className="text-3xl sm:text-4xl font-sans font-bold text-foreground tracking-tight mb-4">
-              Check your email
-            </h1>
-
-            <p className="text-sm font-sans text-muted-foreground leading-relaxed max-w-sm mx-auto mb-8">
-              We sent a magic link to <strong className="text-foreground font-semibold">{email}</strong>. Click it to sign in instantly.
-            </p>
-
-            <div className="pt-2 max-w-xs mx-auto space-y-3">
-              <a
-                href={email.toLowerCase().endsWith("@gmail.com") ? "https://mail.google.com" : `https://${email.split("@")[1] || "gmail.com"}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 w-full py-3 px-5 rounded-xl bg-foreground text-background font-mono text-xs font-bold hover:bg-accent hover:text-black transition-all shadow-md"
+        <div className="space-y-3 text-left">
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={shouldReduceMotion ? {} : { opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={shouldReduceMotion ? {} : { opacity: 0, height: 0 }}
+                className="overflow-hidden"
               >
-                <Mail className="h-4 w-4" /> Open Email Client →
-              </a>
-              <button
-                type="button"
-                onClick={() => setMagicSent(false)}
-                className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors underline cursor-pointer block w-full text-center"
-              >
-                Use password or social login
-              </button>
-            </div>
-          </motion.div>
-        ) : (
-          /* ── Login Form Card ── */
-          <motion.div
-            key="loginCard"
-            initial={shouldReduceMotion ? {} : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}
-            className="mx-auto max-w-sm w-full p-8 text-center bg-card/90 backdrop-blur-xl border border-border/80 rounded-3xl shadow-2xl ring-1 ring-accent/20 hover:ring-accent/40 transition-all duration-300"
-          >
-            {/* Header Badge & Title */}
-            <div className="mb-6">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest bg-secondary text-muted-foreground border border-border/60 mb-3">
-                <Sparkles className="h-3 w-3 text-[oklch(0.88_0.22_130)]" />
-                AUTHENTICATION
-              </span>
-              <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight mb-2">
-                Welcome back
-              </h1>
-              <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-                Sign in to your Fitboard account to continue.
-              </p>
-            </div>
+                <div className="flex items-center gap-2 rounded-xl bg-destructive/10 p-3 text-xs font-mono text-destructive border border-destructive/20">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-            <div className="space-y-3 text-left">
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={shouldReduceMotion ? {} : { opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={shouldReduceMotion ? {} : { opacity: 0, height: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="flex items-center gap-2 rounded-xl bg-destructive/10 p-3 text-xs font-mono text-destructive border border-destructive/20">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      <span>{error}</span>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+          {/* Role Selector */}
+          <div className="p-1 rounded-xl bg-secondary/60 border border-border/80 grid grid-cols-2 gap-1 text-[11px] font-mono mb-2">
+            <button
+              type="button"
+              onClick={() => setRole("CANDIDATE")}
+              className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                role === "CANDIDATE"
+                  ? "bg-background text-foreground border border-border/60 font-bold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Candidate
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole("EMPLOYER")}
+              className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                role === "EMPLOYER"
+                  ? "bg-background text-foreground border border-border/60 font-bold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Recruiter
+            </button>
+          </div>
 
-              {/* Role Selector */}
-              <div className="p-1 rounded-xl bg-secondary/60 border border-border/80 grid grid-cols-2 gap-1 text-[11px] font-mono mb-2">
-                <button
-                  type="button"
-                  onClick={() => setRole("CANDIDATE")}
-                  className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                    role === "CANDIDATE"
-                      ? "bg-background text-foreground border border-border/60 font-bold shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Candidate
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole("EMPLOYER")}
-                  className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                    role === "EMPLOYER"
-                      ? "bg-background text-foreground border border-border/60 font-bold shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Recruiter
-                </button>
-              </div>
-
-              {/* ── 1-Click Social Sign-In (Google & GitHub) ── */}
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => handleOAuthSignIn("google")}
-                  disabled={!!oauthLoading}
-                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/80 text-xs font-mono font-medium text-foreground transition-all cursor-pointer hover:border-accent/40 active:scale-[0.98] disabled:opacity-50"
-                >
-                  {oauthLoading === "google" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <GoogleIcon /> Google
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleOAuthSignIn("github")}
-                  disabled={!!oauthLoading}
-                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/80 text-xs font-mono font-medium text-foreground transition-all cursor-pointer hover:border-accent/40 active:scale-[0.98] disabled:opacity-50"
-                >
-                  {oauthLoading === "github" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <GithubIcon /> GitHub
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Divider */}
-              <div className="relative flex items-center justify-center my-3">
-                <div className="border-t border-border/60 w-full" />
-                <span className="bg-card px-2 text-[10px] font-mono uppercase text-muted-foreground shrink-0">
-                  or email & password
-                </span>
-                <div className="border-t border-border/60 w-full" />
-              </div>
-
-              {/* Mode Toggle (Password vs Magic Link) */}
-              <div className="flex items-center justify-end mb-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode(mode === "password" ? "magic" : "password");
-                    setError(null);
-                  }}
-                  className="text-[11px] font-mono text-muted-foreground hover:text-accent underline transition-colors"
-                >
-                  {mode === "password" ? "Use Magic Link instead" : "Use Password instead"}
-                </button>
-              </div>
-
-              {mode === "password" ? (
-                <form onSubmit={handlePasswordSubmit} className="space-y-3">
-                  <div>
-                    <label htmlFor="login-email-pass-input" className="sr-only">Email address</label>
-                    <input
-                      id="login-email-pass-input"
-                      type="email"
-                      required
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-secondary/60 border border-border/80 rounded-xl px-4 py-3 text-xs text-foreground font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="login-password-input" className="sr-only">Password</label>
-                    <input
-                      id="login-password-input"
-                      type="password"
-                      required
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-secondary/60 border border-border/80 rounded-xl px-4 py-3 text-xs text-foreground font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-xs"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-xs font-mono bg-foreground text-background hover:bg-accent hover:text-black active:scale-[0.97] font-bold transition-all cursor-pointer disabled:opacity-40 shadow-sm"
-                  >
-                    {loading ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Signing in...
-                      </span>
-                    ) : (
-                      "Sign in →"
-                    )}
-                  </button>
-                </form>
+          {/* ── 1-Click Social Sign-In (Google & GitHub) ── */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <button
+              type="button"
+              onClick={() => handleOAuthSignIn("google")}
+              disabled={!!oauthLoading}
+              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/80 text-xs font-mono font-medium text-foreground transition-all cursor-pointer hover:border-accent/40 active:scale-[0.98] disabled:opacity-50"
+            >
+              {oauthLoading === "google" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <form onSubmit={handleMagicSubmit} className="space-y-3">
-                  <div>
-                    <label htmlFor="login-email-magic-input" className="sr-only">Email address</label>
-                    <input
-                      id="login-email-magic-input"
-                      type="email"
-                      required
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-secondary/60 border border-border/80 rounded-xl px-4 py-3 text-xs text-foreground font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-xs"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-xs font-mono bg-foreground text-background hover:bg-accent hover:text-black active:scale-[0.97] font-bold transition-all cursor-pointer disabled:opacity-40 shadow-sm"
-                  >
-                    {loading ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending link...
-                      </span>
-                    ) : (
-                      `Send Magic Link (${role === "EMPLOYER" ? "Recruiter" : "Candidate"})`
-                    )}
-                  </button>
-                </form>
+                <>
+                  <GoogleIcon /> Google
+                </>
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleOAuthSignIn("github")}
+              disabled={!!oauthLoading}
+              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/80 text-xs font-mono font-medium text-foreground transition-all cursor-pointer hover:border-accent/40 active:scale-[0.98] disabled:opacity-50"
+            >
+              {oauthLoading === "github" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <GithubIcon /> GitHub
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="relative flex items-center justify-center my-3">
+            <div className="border-t border-border/60 w-full" />
+            <span className="bg-card px-2 text-[10px] font-mono uppercase text-muted-foreground shrink-0">
+              or email & password
+            </span>
+            <div className="border-t border-border/60 w-full" />
+          </div>
+
+          <form onSubmit={handlePasswordSubmit} className="space-y-3">
+            <div>
+              <label htmlFor="login-email-pass-input" className="sr-only">Email address</label>
+              <input
+                id="login-email-pass-input"
+                type="email"
+                required
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-secondary/60 border border-border/80 rounded-xl px-4 py-3 text-xs text-foreground font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-xs"
+              />
             </div>
 
-            <p className="mt-8 text-[10px] font-mono text-muted-foreground text-center border-t border-border/40 pt-4">
-              {"Don't"} have an account?{" "}
-              <Link href="/register" className="text-foreground hover:text-accent underline font-semibold transition-colors">
-                Sign up free
-              </Link>
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <div>
+              <label htmlFor="login-password-input" className="sr-only">Password</label>
+              <input
+                id="login-password-input"
+                type="password"
+                required
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-secondary/60 border border-border/80 rounded-xl px-4 py-3 text-xs text-foreground font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-xs"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-xs font-mono bg-foreground text-background hover:bg-accent hover:text-black active:scale-[0.97] font-bold transition-all cursor-pointer disabled:opacity-40 shadow-sm"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Signing in...
+                </span>
+              ) : (
+                "Sign in →"
+              )}
+            </button>
+          </form>
+        </div>
+
+        <p className="mt-8 text-[10px] font-mono text-muted-foreground text-center border-t border-border/40 pt-4">
+          {"Don't"} have an account?{" "}
+          <Link href="/register" className="text-foreground hover:text-accent underline font-semibold transition-colors">
+            Sign up free
+          </Link>
+        </p>
+      </motion.div>
     </main>
   );
 }
