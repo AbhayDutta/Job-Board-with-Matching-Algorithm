@@ -330,12 +330,9 @@ function MatchCard() {
       <div className="rounded-2xl border border-border bg-card p-7 shadow-match-glow transition-all duration-300 hover:shadow-match-glow-hover hover:scale-[1.01]">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground flex-wrap">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               <Sparkles className="h-3.5 w-3.5 text-[oklch(0.72_0.18_35)]" />
               Live Match Report
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-accent/20 border border-accent/40 text-[10px] font-mono font-bold text-accent animate-pulse shadow-xs">
-                <MousePointerClick className="h-3 w-3" /> CLICK SKILLS TO TOGGLE SCORE
-              </span>
             </div>
             <div className="mt-1 font-serif text-2xl font-normal text-foreground">
               Priya S. → Senior Backend Eng.
@@ -402,7 +399,7 @@ function MatchCard() {
         <div className="mt-6 flex flex-wrap items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground font-mono gap-2">
           <span className="flex items-center gap-1.5 text-foreground font-semibold">
             <MousePointerClick className="h-3.5 w-3.5 text-accent animate-bounce" />
-            Interactive Demo: Click any skill above to update match score
+            Click any skill above to update match score
           </span>
           <span className="text-[11px] opacity-70">v_c · v_j / ‖v_c‖‖v_j‖</span>
         </div>
