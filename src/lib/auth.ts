@@ -23,6 +23,11 @@ export const authOptions: NextAuthOptions = {
     GitHubProvider({
       clientId: process.env.GITHUB_CLIENT_ID || "dummy_github_id",
       clientSecret: process.env.GITHUB_CLIENT_SECRET || "dummy_github_secret",
+      authorization: {
+        params: {
+          prompt: "consent",
+        },
+      },
       allowDangerousEmailAccountLinking: true,
     }),
     CredentialsProvider({
