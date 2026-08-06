@@ -1,5 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+import GitHubProvider from "next-auth/providers/github";
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { verifyMagicToken } from "@/lib/magic-token";
@@ -8,6 +10,16 @@ const AUTH_SECRET = process.env.NEXTAUTH_SECRET || "fitboard-auth-secret-keys-ne
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || "dummy_google_id",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "dummy_google_secret",
+      allowDangerousEmailAccountLinking: true,
+    }),
+    GitHubProvider({
+      clientId: process.env.GITHUB_CLIENT_ID || "dummy_github_id",
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || "dummy_github_secret",
+      allowDangerousEmailAccountLinking: true,
+    }),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -130,6 +142,55 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === "google" || account?.provider === "github") {
+        if (!user.email) return false;
+        const lowerEmail = user.email.toLowerCase().trim();
+        let dbUser = await db.user.findUnique({
+          where: { email: lowerEmail },
+          include: { candidateProfile: true },
+        });
+
+        if (!dbUser) {
+          const userName = user.name || lowerEmail.split("@")[0];
+          dbUser = await db.user.create({
+            data: {
+              email: lowerEmail,
+              name: userName,
+              password: "OAUTH_USER",
+              role: "CANDIDATE",
+              avatarUrl: user.image || null,
+              candidateProfile: {
+                create: {
+                  name: userName,
+                  skills: [],
+                  experience: [],
+                  education: [],
+                },
+              },
+            },
+            include: { candidateProfile: true },
+          });
+          console.log(`[Auth OAuth] Created new user for ${account.provider}: ${dbUser.id} (${lowerEmail})`);
+        } else {
+          if (!dbUser.candidateProfile) {
+            await db.candidateProfile.create({
+              data: {
+                userId: dbUser.id,
+                name: dbUser.name || lowerEmail.split("@")[0],
+                skills: [],
+                experience: [],
+                education: [],
+              },
+            });
+          }
+        }
+
+        user.id = dbUser.id;
+        (user as any).role = dbUser.role;
+      }
+      return true;
+    },
     async jwt({ token, user, trigger, session: updateSession }) {
       if (user) {
         token.id = user.id;
